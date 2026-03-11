@@ -69,34 +69,32 @@ STRING_TYPES = {"NonEmptyString", "Id", "Sha256", "Timestamp"}
 # ---------------------------------------------------------------------------
 
 
-def _collect_required(schema_def: dict[str, Any]) -> set[str]:
-    """Collect all required field names, following allOf and $ref."""
-    required: set[str] = set()
-    if "required" in schema_def:
-        required.update(schema_def["required"])
+def _collect_from_schema(
+    schema_def: dict[str, Any],
+    key: str,
+    extract: Any = None,
+) -> set[str]:
+    """Collect field names from a schema def, following allOf and $ref.
+
+    For 'required': collects the list values directly.
+    For 'properties': collects the dict keys.
+    """
+    if extract is None:
+        extract = dict.keys if key == "properties" else list.__iter__
+
+    result: set[str] = set()
+    if key in schema_def:
+        val = schema_def[key]
+        result.update(val.keys() if isinstance(val, dict) else val)
     for item in schema_def.get("allOf", []):
-        if "required" in item:
-            required.update(item["required"])
+        if key in item:
+            val = item[key]
+            result.update(val.keys() if isinstance(val, dict) else val)
         if "$ref" in item:
             ref_name = item["$ref"].split("/")[-1]
             if ref_name in DEFS:
-                required.update(_collect_required(DEFS[ref_name]))
-    return required
-
-
-def _collect_properties(schema_def: dict[str, Any]) -> set[str]:
-    """Collect all property names, following allOf and $ref."""
-    props: set[str] = set()
-    if "properties" in schema_def:
-        props.update(schema_def["properties"].keys())
-    for item in schema_def.get("allOf", []):
-        if "properties" in item:
-            props.update(item["properties"].keys())
-        if "$ref" in item:
-            ref_name = item["$ref"].split("/")[-1]
-            if ref_name in DEFS:
-                props.update(_collect_properties(DEFS[ref_name]))
-    return props
+                result.update(_collect_from_schema(DEFS[ref_name], key))
+    return result
 
 
 def _get_pydantic_fields(model_cls: type) -> set[str]:
@@ -132,7 +130,7 @@ class TestEnumDrift:
 class TestModelDrift:
     @pytest.mark.parametrize("name,model_cls", list(MODEL_MAP.items()))
     def test_required_fields_match(self, name: str, model_cls: type) -> None:
-        schema_required = _collect_required(DEFS[name])
+        schema_required = _collect_from_schema(DEFS[name], "required")
         pydantic_required = _get_pydantic_required(model_cls)
         assert schema_required == pydantic_required, (
             f"Model {name} required drift: "
@@ -142,7 +140,7 @@ class TestModelDrift:
 
     @pytest.mark.parametrize("name,model_cls", list(MODEL_MAP.items()))
     def test_property_names_match(self, name: str, model_cls: type) -> None:
-        schema_props = _collect_properties(DEFS[name])
+        schema_props = _collect_from_schema(DEFS[name], "properties")
         pydantic_fields = _get_pydantic_fields(model_cls)
         assert schema_props == pydantic_fields, (
             f"Model {name} property drift: "

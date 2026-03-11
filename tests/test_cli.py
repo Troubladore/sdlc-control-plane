@@ -72,3 +72,4 @@ class TestValidateCLI:
             main, ["validate", str(FIXTURES / "invalid_missing_fields.json")]
         )
         assert result.exit_code == 1
+        assert "Field required" in result.output

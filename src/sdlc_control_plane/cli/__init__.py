@@ -30,10 +30,6 @@ def validate(files: tuple[str, ...], cert_type: str | None) -> None:
     exit_code = 0
     for file_path_str in files:
         file_path = Path(file_path_str)
-        if not file_path.exists():
-            console.print(f"[red]\u2717[/red] {file_path} \u2014 file not found")
-            exit_code = max(exit_code, 2)
-            continue
         try:
             data: dict[str, Any] = json.loads(file_path.read_text())
         except (json.JSONDecodeError, OSError) as e:

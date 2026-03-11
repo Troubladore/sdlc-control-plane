@@ -120,12 +120,12 @@ class TestPydanticErrorsToDiagnostics:
 
     def test_translates_missing_field_errors(self) -> None:
         error = self._make_validation_error()
-        diagnostics = pydantic_errors_to_diagnostics(error, file_path="cert.json")
+        diagnostics = pydantic_errors_to_diagnostics(error)
         assert len(diagnostics) > 0
 
     def test_all_diagnostics_have_correct_severity_category_code(self) -> None:
         error = self._make_validation_error()
-        diagnostics = pydantic_errors_to_diagnostics(error, file_path="cert.json")
+        diagnostics = pydantic_errors_to_diagnostics(error)
         for d in diagnostics:
             assert d.severity == "error"
             assert d.category == "structure"
@@ -133,7 +133,7 @@ class TestPydanticErrorsToDiagnostics:
 
     def test_message_contains_pydantic_error_text(self) -> None:
         error = self._make_validation_error()
-        diagnostics = pydantic_errors_to_diagnostics(error, file_path="cert.json")
+        diagnostics = pydantic_errors_to_diagnostics(error)
         # At least one diagnostic should contain "Field required"
         messages = [d.message for d in diagnostics]
         assert any("Field required" in m for m in messages)
@@ -217,9 +217,7 @@ class TestPydanticErrorsToDiagnostics:
         with pytest.raises(ValidationError) as exc_info:
             TaskReviewCertificate.model_validate(payload)
 
-        diagnostics = pydantic_errors_to_diagnostics(
-            exc_info.value, file_path="cert.json"
-        )
+        diagnostics = pydantic_errors_to_diagnostics(exc_info.value)
         paths = [d.path for d in diagnostics]
 
         # There must be no " -> " separators in any path

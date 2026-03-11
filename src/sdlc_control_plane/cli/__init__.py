@@ -32,7 +32,8 @@ def _sort_diagnostics(diagnostics: list[Diagnostic]) -> list[Diagnostic]:
     )
 
 
-def _render_diagnostics(file_path: str, diagnostics: list[Diagnostic]) -> None:
+def _render_diagnostics(file_path: str, diagnostics: list[Diagnostic]) -> bool:
+    """Render grouped diagnostics to console. Returns True if any errors."""
     has_errors = any(d.severity == "error" for d in diagnostics)
     icon = "[red]\u2717[/red]" if has_errors else "[yellow]![/yellow]"
     console.print(f"{icon} {file_path}")
@@ -49,6 +50,7 @@ def _render_diagnostics(file_path: str, diagnostics: list[Diagnostic]) -> None:
         line = f"    [{sev_color}]{sev_label}[/{sev_color}]  "
         line += f"{d.path}: {d.code} \u2014 {d.message}{related}"
         console.print(line)
+    return has_errors
 
 
 @click.group()
@@ -101,7 +103,7 @@ def validate(files: tuple[str, ...], cert_type: str | None, project_root: str | 
             exit_code = max(exit_code, 1)
             continue
         except ValidationError as e:
-            diagnostics = pydantic_errors_to_diagnostics(e, str(file_path))
+            diagnostics = pydantic_errors_to_diagnostics(e)
             _render_diagnostics(str(file_path), diagnostics)
             exit_code = max(exit_code, 1)
             continue
@@ -116,8 +118,7 @@ def validate(files: tuple[str, ...], cert_type: str | None, project_root: str | 
 
         # Render results
         if all_diagnostics:
-            _render_diagnostics(str(file_path), all_diagnostics)
-            if any(d.severity == "error" for d in all_diagnostics):
+            if _render_diagnostics(str(file_path), all_diagnostics):
                 exit_code = max(exit_code, 1)
         else:
             console.print(f"[green]\u2713[/green] {file_path}")

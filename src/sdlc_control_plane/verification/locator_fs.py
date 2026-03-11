@@ -2,32 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
-
-from pydantic import BaseModel
+from typing import TYPE_CHECKING
 
 from sdlc_control_plane.verification.diagnostics import Diagnostic
 from sdlc_control_plane.verification.models import CertificateEnvelope, Locator
+from sdlc_control_plane.verification.referential import _walk
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-
-def _collect_locators(obj: Any, path: str) -> list[tuple[str, Locator]]:
-    """Recursively collect all Locator instances with their JSON paths."""
-    results: list[tuple[str, Locator]] = []
-    if not isinstance(obj, BaseModel):
-        return results
-    if isinstance(obj, Locator):
-        results.append((path, obj))
-    for field_name, field_value in obj:
-        child_path = f"{path}.{field_name}" if path else field_name
-        if isinstance(field_value, BaseModel):
-            results.extend(_collect_locators(field_value, child_path))
-        elif isinstance(field_value, list):
-            for i, item in enumerate(field_value):
-                results.extend(_collect_locators(item, f"{child_path}[{i}]"))
-    return results
 
 
 def validate_filesystem(
@@ -39,7 +21,8 @@ def validate_filesystem(
     Only call when --project-root is provided and is a valid directory.
     """
     diagnostics: list[Diagnostic] = []
-    locators = _collect_locators(certificate, "")
+    all_nodes = _walk(certificate, "")
+    locators = [(p, n) for p, n in all_nodes if isinstance(n, Locator)]
 
     for json_path, loc in locators:
         if loc.path is None:
@@ -74,7 +57,8 @@ def validate_filesystem(
             continue
 
         if resolved.is_file() and loc.end_line is not None:
-            line_count = sum(1 for _ in resolved.open())
+            with resolved.open() as f:
+                line_count = sum(1 for _ in f)
             if loc.end_line > line_count:
                 diagnostics.append(
                     Diagnostic(

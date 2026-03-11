@@ -22,7 +22,6 @@ class Diagnostic(BaseModel):
 
 def pydantic_errors_to_diagnostics(
     error: ValidationError,
-    file_path: str,
 ) -> list[Diagnostic]:
     """Translate a Pydantic ValidationError into Diagnostic objects.
 

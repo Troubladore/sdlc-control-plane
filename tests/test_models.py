@@ -1113,3 +1113,60 @@ class TestFixtureRoundTrip:
         cert = validate_certificate(data)
         assert isinstance(cert, TaskReviewCertificate)
         assert cert.formal_conclusion.status == "complete"
+
+    def test_valid_design_decision_fixture(self) -> None:
+        fixture_path = FIXTURE_DIR / "valid_design_decision.json"
+        data = json.loads(fixture_path.read_text())
+        cert = validate_certificate(data)
+        assert isinstance(cert, DesignDecisionCertificate)
+        assert cert.formal_conclusion.status == "justified"
+
+    def test_valid_deferred_scope_fixture(self) -> None:
+        fixture_path = FIXTURE_DIR / "valid_deferred_scope.json"
+        data = json.loads(fixture_path.read_text())
+        cert = validate_certificate(data)
+        assert isinstance(cert, DeferredScopeCertificate)
+        assert cert.formal_conclusion.status == "valid"
+
+    def test_valid_impact_alignment_fixture(self) -> None:
+        fixture_path = FIXTURE_DIR / "valid_impact_alignment.json"
+        data = json.loads(fixture_path.read_text())
+        cert = validate_certificate(data)
+        assert isinstance(cert, ImpactAlignmentCertificate)
+        assert cert.formal_conclusion.status == "aligned"
+
+    def test_invalid_missing_fields_fixture(self) -> None:
+        fixture_path = FIXTURE_DIR / "invalid_missing_fields.json"
+        data = json.loads(fixture_path.read_text())
+        with pytest.raises(ValidationError):
+            TaskReviewCertificate(**data)
+
+    def test_invalid_bad_enum_fixture(self) -> None:
+        fixture_path = FIXTURE_DIR / "invalid_bad_enum.json"
+        data = json.loads(fixture_path.read_text())
+        with pytest.raises(ValidationError):
+            TaskReviewCertificate(**data)
+
+    def test_invalid_extra_fields_fixture(self) -> None:
+        fixture_path = FIXTURE_DIR / "invalid_extra_fields.json"
+        data = json.loads(fixture_path.read_text())
+        with pytest.raises(ValidationError):
+            TaskReviewCertificate(**data)
+
+    def test_invalid_missing_fields_via_dispatch(self) -> None:
+        fixture_path = FIXTURE_DIR / "invalid_missing_fields.json"
+        data = json.loads(fixture_path.read_text())
+        with pytest.raises(ValidationError):
+            validate_certificate(data)
+
+    def test_invalid_bad_enum_via_dispatch(self) -> None:
+        fixture_path = FIXTURE_DIR / "invalid_bad_enum.json"
+        data = json.loads(fixture_path.read_text())
+        with pytest.raises(ValidationError):
+            validate_certificate(data)
+
+    def test_invalid_extra_fields_via_dispatch(self) -> None:
+        fixture_path = FIXTURE_DIR / "invalid_extra_fields.json"
+        data = json.loads(fixture_path.read_text())
+        with pytest.raises(ValidationError):
+            validate_certificate(data)

@@ -510,25 +510,25 @@ class CertificateEnvelope(BaseModel):
 class TaskReviewConclusion(FormalConclusion):
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["complete", "not_complete"]
+    status: Literal["complete", "not_complete"]  # type: ignore[assignment]
 
 
 class DesignDecisionConclusion(FormalConclusion):
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["justified", "needs_revision"]
+    status: Literal["justified", "needs_revision"]  # type: ignore[assignment]
 
 
 class DeferredScopeConclusion(FormalConclusion):
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["valid", "invalid"]
+    status: Literal["valid", "invalid"]  # type: ignore[assignment]
 
 
 class ImpactAlignmentConclusion(FormalConclusion):
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["aligned", "not_aligned"]
+    status: Literal["aligned", "not_aligned"]  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -539,7 +539,7 @@ class ImpactAlignmentConclusion(FormalConclusion):
 class TaskReviewCertificate(CertificateEnvelope):
     model_config = ConfigDict(extra="forbid")
 
-    certificate_type: Literal["task_review"]
+    certificate_type: Literal["task_review"]  # type: ignore[assignment]
     definition: NonEmptyString
     premises: list[PremiseClaim] = Field(min_length=1)
     quality_assertions: list[QualityAssertion] = Field(min_length=1)
@@ -551,7 +551,7 @@ class TaskReviewCertificate(CertificateEnvelope):
 class DesignDecisionCertificate(CertificateEnvelope):
     model_config = ConfigDict(extra="forbid")
 
-    certificate_type: Literal["design_decision"]
+    certificate_type: Literal["design_decision"]  # type: ignore[assignment]
     definition: NonEmptyString
     decision_topic: NonEmptyString
     comparison: DesignComparison
@@ -561,7 +561,7 @@ class DesignDecisionCertificate(CertificateEnvelope):
 class DeferredScopeCertificate(CertificateEnvelope):
     model_config = ConfigDict(extra="forbid")
 
-    certificate_type: Literal["deferred_scope"]
+    certificate_type: Literal["deferred_scope"]  # type: ignore[assignment]
     definition: NonEmptyString
     deferred_work: NonEmptyString
     tracking_issue: ArtifactRef
@@ -575,7 +575,7 @@ class DeferredScopeCertificate(CertificateEnvelope):
 class ImpactAlignmentCertificate(CertificateEnvelope):
     model_config = ConfigDict(extra="forbid")
 
-    certificate_type: Literal["impact_alignment"]
+    certificate_type: Literal["impact_alignment"]  # type: ignore[assignment]
     definition: NonEmptyString
     roadmap_impacts: list[IssueImpactAssessment]
     open_issue_scan: list[IssueImpactAssessment] = Field(min_length=1)

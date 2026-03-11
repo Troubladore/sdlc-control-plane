@@ -12,15 +12,24 @@ from sdlc_control_plane.verification.models import (
     ArtifactType,
     AuthorKind,
     CertificateType,
+    CommandVerification,
     CommandVerificationStatus,
     EvidenceRef,
     EvidenceType,
     ExecutorType,
+    FormalConclusion,
+    FormalConclusionStatus,
+    GateEvaluation,
     GateStatus,
     Id,
+    IssueFinding,
     IssueFindingStatus,
     Locator,
     NonEmptyString,
+    PremiseClaim,
+    PremiseStatus,
+    QualityAssertion,
+    QualityAssertionStatus,
     Severity,
     ValidationStatus,
     VerificationMethod,
@@ -200,3 +209,111 @@ class TestVerificationRecord:
             verified_at="2026-03-11T00:00:00Z",
         )
         assert vr.status == VerifiedStatus.VERIFIED
+
+
+def _make_evidence_ref() -> EvidenceRef:
+    return EvidenceRef(
+        evidence_id="ev-1",
+        evidence_type="file_span",
+        artifact_ref=ArtifactRef(artifact_id="art-1", artifact_type="file"),
+    )
+
+
+class TestPremiseClaim:
+    def test_valid(self) -> None:
+        pc = PremiseClaim(
+            claim_id="p1",
+            text="All tests pass",
+            evidence_refs=[_make_evidence_ref()],
+            status="satisfied",
+        )
+        assert pc.status == PremiseStatus.SATISFIED
+
+    def test_empty_evidence_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            PremiseClaim(
+                claim_id="p1",
+                text="x",
+                evidence_refs=[],
+                status="satisfied",
+            )
+
+    def test_rejects_extra_field(self) -> None:
+        with pytest.raises(ValidationError):
+            PremiseClaim(
+                claim_id="p1",
+                text="x",
+                evidence_refs=[_make_evidence_ref()],
+                status="satisfied",
+                bogus="y",
+            )
+
+
+class TestQualityAssertion:
+    def test_valid(self) -> None:
+        qa = QualityAssertion(
+            claim_id="q1",
+            text="Code is type-safe",
+            evidence_refs=[_make_evidence_ref()],
+            status="verified",
+        )
+        assert qa.status == QualityAssertionStatus.VERIFIED
+
+
+class TestIssueFinding:
+    def test_valid_minimal(self) -> None:
+        f = IssueFinding(issue_id="i1", description="Bug found", severity="minor")
+        assert f.severity == Severity.MINOR
+
+    def test_valid_with_optional_status(self) -> None:
+        f = IssueFinding(
+            issue_id="i1",
+            description="Bug",
+            severity="critical",
+            status="open",
+        )
+        assert f.status == IssueFindingStatus.OPEN
+
+
+class TestCommandVerification:
+    def test_valid(self) -> None:
+        cv = CommandVerification(
+            command_id="cmd-1",
+            command="pytest",
+            exit_code=0,
+            status="passed",
+        )
+        assert cv.status == CommandVerificationStatus.PASSED
+
+    def test_with_optional_singular_evidence_ref(self) -> None:
+        cv = CommandVerification(
+            command_id="cmd-1",
+            command="pytest",
+            exit_code=0,
+            status="passed",
+            evidence_ref=_make_evidence_ref(),
+        )
+        assert cv.evidence_ref is not None
+
+
+class TestFormalConclusion:
+    def test_valid(self) -> None:
+        fc = FormalConclusion(
+            status="complete",
+            derived_from_claim_ids=["p1", "q1"],
+        )
+        assert fc.status == FormalConclusionStatus.COMPLETE
+
+    def test_empty_derived_from_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            FormalConclusion(status="complete", derived_from_claim_ids=[])
+
+
+class TestGateEvaluation:
+    def test_valid(self) -> None:
+        ge = GateEvaluation(
+            gate_id="g1",
+            requirement="Tests pass",
+            status="passed",
+        )
+        assert ge.status == GateStatus.PASSED

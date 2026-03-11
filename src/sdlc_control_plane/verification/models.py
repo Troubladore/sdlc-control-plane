@@ -350,3 +350,72 @@ class VerificationRecord(BaseModel):
     verified_at: Timestamp
     evidence_checked: list[Id] | None = None
     notes: NonEmptyString | None = None
+
+
+# ---------------------------------------------------------------------------
+# Claim and finding models
+# ---------------------------------------------------------------------------
+
+
+class ClaimBase(BaseModel):
+    """Base for claims. Not leaf -- no extra='forbid' here."""
+
+    claim_id: Id
+    text: NonEmptyString
+    evidence_refs: list[EvidenceRef] = Field(min_length=1)
+    verification: VerificationRecord | None = None
+    notes: NonEmptyString | None = None
+
+
+class PremiseClaim(ClaimBase):
+    model_config = ConfigDict(extra="forbid")
+
+    status: PremiseStatus
+
+
+class QualityAssertion(ClaimBase):
+    model_config = ConfigDict(extra="forbid")
+
+    status: QualityAssertionStatus
+
+
+class IssueFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    issue_id: Id
+    description: NonEmptyString
+    severity: Severity
+    evidence_refs: list[EvidenceRef] | None = None
+    verification: VerificationRecord | None = None
+    status: IssueFindingStatus | None = None
+
+
+class CommandVerification(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: Id
+    command: NonEmptyString
+    summary: NonEmptyString | None = None
+    exit_code: int = Field(ge=0)
+    status: CommandVerificationStatus
+    fresh: bool | None = None
+    evidence_ref: EvidenceRef | None = None
+    verification: VerificationRecord | None = None
+
+
+class FormalConclusion(BaseModel):
+    """Base conclusion. Not leaf -- certificates constrain status further."""
+
+    status: FormalConclusionStatus
+    summary: NonEmptyString | None = None
+    derived_from_claim_ids: list[Id] = Field(min_length=1)
+
+
+class GateEvaluation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    gate_id: Id
+    requirement: NonEmptyString
+    status: GateStatus
+    verifier_artifacts: list[ArtifactRef] | None = None
+    notes: NonEmptyString | None = None

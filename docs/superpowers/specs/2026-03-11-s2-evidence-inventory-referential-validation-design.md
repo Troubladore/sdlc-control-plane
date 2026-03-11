@@ -46,8 +46,9 @@ sdlc validate <files...> [--project-root PATH] [--type TYPE]
 All validation results — structural, referential, and filesystem — are represented as `Diagnostic` objects:
 
 ```python
-@dataclass(frozen=True)
-class Diagnostic:
+class Diagnostic(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     severity: Literal["error", "warning"]
     category: Literal["structure", "reference", "filesystem"]
     code: str
@@ -55,6 +56,8 @@ class Diagnostic:
     message: str
     related_path: str | None = None  # For duplicates: location of first definition
 ```
+
+`Diagnostic` uses Pydantic `BaseModel` (not `@dataclass`) to stay consistent with the project convention that all data structures use Pydantic. `frozen=True` ensures immutability. Using `BaseModel` also gives free JSON serialization for future machine-readable output.
 
 - Any error diagnostic causes exit 1.
 - Warnings print but do not affect exit code.
@@ -90,9 +93,11 @@ class CertificateEnvelope(BaseModel):
 
 ### 3.2 Semantics
 
-**Canonical S2 format (going forward):** Inventories are required. They are the single source of truth for artifact and evidence definitions within a certificate.
+**Model level:** The fields are optional (`None` default) for backward compatibility. Pydantic does not reject certificates missing inventories.
 
-**Legacy compatibility:** Certificates without inventories are accepted in compatibility mode. The validator falls back to treating each inline occurrence as a definition, and duplicates remain errors. This is transitional — new certificates should always include inventories.
+**Convention level:** New certificates (S2+) should always include inventories. When inventories are present, they are the single source of truth for artifact and evidence definitions. When absent, the validator falls back to treating each inline occurrence as a definition, and duplicates remain errors.
+
+This is a deliberate split: the Pydantic model is permissive (accepts legacy input), while referential validation adds convention-level rigor. The "required" expectation is enforced by documentation and by certificate-producing tooling (S6+), not by structural schema validation.
 
 ### 3.3 Inline References
 
@@ -124,11 +129,12 @@ Lightweight reference types (ID-only inline references) are a future refinement 
 | `duplicate_evidence_id` | error | Same `evidence_id` on multiple `EvidenceRef` nodes. Duplicates mean duplicate *definitions*, not duplicate citations. `related_path` points to first definition. |
 | `duplicate_artifact_id` | error | Same `artifact_id` on multiple `ArtifactRef` nodes. Same semantics as evidence. `related_path` points to first definition. |
 | `missing_claim_ref` | error | ID in `formal_conclusion.derived_from_claim_ids` not found in any `ClaimBase` node in the document. |
-| `missing_evidence_in_verification` | error | ID in `verification.evidence_checked` not found in any `EvidenceRef` node in the document. |
+| `missing_evidence_in_verification` | error | ID in `VerificationRecord.evidence_checked` not found in any `EvidenceRef.evidence_id` in the document. Matching is document-wide (consistent with the global namespace decision). |
 | `empty_locator` | warning | `Locator` object exists but all fields are `None`. |
+| `note_only_locator` | warning | `Locator` has only `note` set — no resolvable target (no path, URL, command, or commit SHA). Structurally populated but semantically unresolvable. |
 | `invalid_line_range` | error | `start_line > end_line` on a `Locator`. This is an impossible span — malformed data, not stale state. |
 | `absolute_path_not_allowed` | error | `Locator.path` is an absolute path. Paths must be relative to project root. |
-| `path_escapes_project_root` | error | `Locator.path` normalizes outside project root (e.g. `../../etc/passwd`). This is a **lexical containment check against a synthetic root** — it validates the document's claim about path structure without needing `--project-root`. |
+| `path_escapes_project_root` | error | `Locator.path` normalizes outside project root (e.g. `../../etc/passwd`). This is a **lexical containment check against a synthetic root** — it validates the document's claim about path structure without needing `--project-root`. Algorithm: `PurePosixPath('/synthetic') / locator_path` is resolved; if the result does not start with `/synthetic/`, the check fails. The synthetic root is arbitrary; only the containment test matters. |
 
 **Inventory-specific checks** (only when `artifact_inventory` / `evidence_inventory` are present):
 
@@ -138,8 +144,8 @@ Lightweight reference types (ID-only inline references) are a future refinement 
 | `missing_evidence_from_inventory` | error | An `evidence_id` used inline but not in `evidence_inventory`. |
 | `unused_artifact_inventory_entry` | warning | An `artifact_inventory` entry not referenced anywhere inline. |
 | `unused_evidence_inventory_entry` | warning | An `evidence_inventory` entry not referenced anywhere inline. |
-| `artifact_definition_mismatch` | error | Inline `ArtifactRef` has different `artifact_type`, `content_hash`, `uri`, or `locator` than the canonical inventory entry. |
-| `evidence_definition_mismatch` | error | Inline `EvidenceRef` has different `evidence_type`, `excerpt_hash`, or `excerpt` than the canonical inventory entry. |
+| `artifact_definition_mismatch` | error | Inline `ArtifactRef` has different `artifact_type`, `content_hash`, `uri`, or `locator` than the canonical inventory entry. `description` is excluded from comparison — it may vary in verbosity across inline occurrences without constituting a semantic mismatch. |
+| `evidence_definition_mismatch` | error | Inline `EvidenceRef` has different `evidence_type`, `excerpt_hash`, `excerpt`, or `artifact_ref` than the canonical inventory entry. The full `artifact_ref` is compared because an evidence item pointing to a different artifact than the canonical entry is a semantic error. |
 
 ### 4.2 Claim Namespace Semantics
 
@@ -171,24 +177,42 @@ The current embedded model has no separate "reference by ID" mechanism — each 
 |------|----------|-------------|
 | `pydantic_validation_error` | error | Translated from `ValidationError`. One diagnostic per Pydantic error, with JSON path. |
 
-### 4.6 Total: 16 Check Codes
+### 4.6 Total: 20 Check Codes
 
-- 15 referential (9 always-run + 6 inventory-specific)
+- 10 always-run referential
+- 6 inventory-specific referential
 - 3 filesystem
 - 1 structural translation
 
 ## 5. Generic Tree Walk
 
-The referential validator walks the full model tree generically rather than per-certificate-type:
+The referential validator walks the full model tree **recursively** rather than per-certificate-type:
 
 1. Collect all `ClaimBase` instances with their JSON paths.
 2. Collect all `EvidenceRef` instances with their JSON paths.
-3. Collect all `ArtifactRef` instances with their JSON paths.
-4. Collect all `Locator` instances with their JSON paths.
+3. Collect all `ArtifactRef` instances with their JSON paths — **including those nested inside `EvidenceRef.artifact_ref`**.
+4. Collect all `Locator` instances with their JSON paths — **including those nested inside `ArtifactRef.locator` at any depth**.
 5. Collect all `VerificationRecord` instances with their JSON paths.
 6. Run checks against collected sets.
 
 This ensures new certificate types get baseline referential coverage automatically. Per-type logic is only needed where a certificate type has specific structural rules (e.g., `TaskReviewCertificate` has `premises` and `quality_assertions` that contribute to the claim namespace).
+
+### 5.1 Non-obvious Collection Sources
+
+The tree walk must collect `EvidenceRef` and `ArtifactRef` from all model types that contain them, not just `ClaimBase` nodes. Key sources beyond claims:
+
+| Model | Field | Type |
+|-------|-------|------|
+| `IssueFinding` | `evidence_refs` | `list[EvidenceRef] \| None` |
+| `CommandVerification` | `evidence_ref` | `EvidenceRef \| None` (singular) |
+| `IssueImpactAssessment` | `verification` | `VerificationRecord` (contains `evidence_checked`) |
+| `DocumentationImpact` | `verification` | `VerificationRecord \| None` |
+| `GateEvaluation` | `verifier_artifacts` | `list[ArtifactRef] \| None` (artifacts, not evidence) |
+| `CertificateEnvelope` | `issue_ref`, `pr_ref`, `source_artifacts` | `ArtifactRef` / `list[ArtifactRef]` |
+| `RoadmapPosition` | `blocked_by`, `blocks` | `list[ArtifactRef]` |
+| `DependencyGraph` | `unblocked_issues`, `blocked_by_updates`, `new_issues` | `list[ArtifactRef]` |
+
+`IssueFinding` has `issue_id` (not `claim_id`) and is **not** a `ClaimBase` subclass — its IDs are not part of the claim namespace, but its evidence refs are collected for duplicate/inventory checks.
 
 ## 6. File Layout
 
@@ -197,7 +221,7 @@ This ensures new certificate types get baseline referential coverage automatical
 ```
 src/sdlc_control_plane/verification/
     models.py              # (modify) Add artifact_inventory, evidence_inventory to CertificateEnvelope
-    diagnostics.py         # (new) Diagnostic dataclass, pydantic_errors_to_diagnostics()
+    diagnostics.py         # (new) Diagnostic model (Pydantic), pydantic_errors_to_diagnostics()
     referential.py         # (new) validate_refs() — pure intra-document checks + inventory checks
     locator_fs.py          # (new) validate_filesystem() — project-root-gated checks
     __init__.py            # (modify) re-export public API
@@ -221,7 +245,7 @@ tests/
 ### 6.3 Key Design Decisions
 
 - `referential.py` and `locator_fs.py` are separate modules — each has a clear single responsibility and can be tested/imported independently.
-- `diagnostics.py` owns the `Diagnostic` dataclass and the Pydantic translation utility. It is a shared contract, not an orchestration layer.
+- `diagnostics.py` owns the `Diagnostic` model and the Pydantic error translation utility. It is a shared contract, not an orchestration layer.
 - `locator_fs.py` (not `filesystem.py`) — the module specifically resolves `Locator` fields against the filesystem. When URL or git-based locator resolution is added later, the naming pattern is clear: `locator_url.py`, `locator_git.py`.
 - No new dependencies — everything uses stdlib + Pydantic + Rich (already in deps).
 
@@ -298,6 +322,8 @@ Explicitly deferred from S2:
 | Cross-certificate referential validation | Requires persistent inventory across runs | Future issue (C) |
 | Orphan evidence detection | Needs research — embedded model makes orphans ill-defined | Future issue |
 | Verification completeness checks | S5 claim verification engine concern | S5 |
+| Evidence inventory builder | Certificate production tooling, not validation | S6+ |
+| `--format json` CLI output | Defer until real automation consumer exists; library API is machine-readable | Future |
 
 ## 9. Testing Strategy
 
@@ -315,7 +341,7 @@ Explicitly deferred from S2:
 1. `sdlc validate valid_certificate.json` passes structural + referential checks (exit 0).
 2. `sdlc validate broken_refs.json` catches and reports all broken references (exit 1).
 3. `sdlc validate cert.json --project-root .` catches missing file paths (exit 1).
-4. Diagnostics are machine-readable with consistent codes, paths, and categories.
+4. Diagnostics are machine-readable at the library API level (`Diagnostic` Pydantic model with consistent codes, paths, and categories). CLI output is human-formatted; `--format json` is deferred.
 5. Output is grouped by category in deterministic order.
 6. All existing tests continue passing.
 7. `make check` passes (lint + type check + tests).

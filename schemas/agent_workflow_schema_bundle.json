@@ -1,0 +1,845 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/agent-workflow-schema-bundle.json",
+  "title": "Agent Workflow Schema Bundle",
+  "description": "Named schemas for certificate-driven development, dispute handling, workflow transitions, remediation, and KPI instrumentation. Validate instances against the desired entry under $defs.",
+  "$defs": {
+    "NonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "Sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "Severity": {
+      "type": "string",
+      "enum": ["critical", "important", "minor", "info"]
+    },
+    "AuthorKind": {
+      "type": "string",
+      "enum": ["claude", "codex", "gemini", "human", "tool", "system"]
+    },
+    "ExecutorType": {
+      "type": "string",
+      "enum": ["static", "tool", "llm", "human"]
+    },
+    "WorkflowState": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "triage",
+        "design",
+        "planning",
+        "implementing",
+        "simplify",
+        "self_review",
+        "certificate_review",
+        "issues",
+        "certified",
+        "integration",
+        "complete"
+      ]
+    },
+    "ArtifactType": {
+      "type": "string",
+      "enum": [
+        "certificate",
+        "certificate_markdown",
+        "file",
+        "file_span",
+        "issue",
+        "issue_body",
+        "issue_title",
+        "command_output",
+        "junit_xml",
+        "coverage_report",
+        "sarif",
+        "git_commit",
+        "git_diff",
+        "pull_request",
+        "roadmap_doc",
+        "design_doc",
+        "plan_doc",
+        "reference_repo",
+        "rendered_output",
+        "workflow_event",
+        "remediation_log"
+      ]
+    },
+    "EvidenceType": {
+      "type": "string",
+      "enum": [
+        "file_span",
+        "issue_body",
+        "issue_title",
+        "command_output",
+        "command_rerun",
+        "test_result",
+        "lint_result",
+        "typecheck_result",
+        "commit",
+        "diff_hunk",
+        "roadmap_entry",
+        "documentation_page",
+        "reference_code",
+        "log_entry",
+        "signature_check",
+        "hash_check"
+      ]
+    },
+    "VerificationMethod": {
+      "type": "string",
+      "enum": [
+        "source_read",
+        "command_rerun",
+        "title_scan",
+        "issue_body_read",
+        "diff_review",
+        "signature_check",
+        "hash_chain_check",
+        "cross_model_review",
+        "human_review"
+      ]
+    },
+    "VerifiedStatus": {
+      "type": "string",
+      "enum": ["verified", "failed", "not_checked", "inconclusive"]
+    },
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor_id", "author_kind", "role"],
+      "properties": {
+        "actor_id": { "$ref": "#/$defs/Id" },
+        "author_kind": { "$ref": "#/$defs/AuthorKind" },
+        "role": {
+          "type": "string",
+          "enum": [
+            "implementer",
+            "reviewer_a",
+            "reviewer_b",
+            "finder",
+            "validator",
+            "arbiter",
+            "maintainer",
+            "system"
+          ]
+        },
+        "display_name": { "$ref": "#/$defs/NonEmptyString" },
+        "model_family": { "$ref": "#/$defs/NonEmptyString" },
+        "version": { "$ref": "#/$defs/NonEmptyString" }
+      }
+    },
+    "Locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/NonEmptyString" },
+        "start_line": { "type": "integer", "minimum": 1 },
+        "end_line": { "type": "integer", "minimum": 1 },
+        "issue_number": { "type": "integer", "minimum": 1 },
+        "url": { "type": "string", "format": "uri" },
+        "command": { "$ref": "#/$defs/NonEmptyString" },
+        "commit_sha": { "type": "string", "pattern": "^[A-Fa-f0-9]{7,40}$" },
+        "diff_hunk": { "$ref": "#/$defs/NonEmptyString" },
+        "note": { "$ref": "#/$defs/NonEmptyString" }
+      }
+    },
+    "ArtifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "artifact_type"],
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/Id" },
+        "artifact_type": { "$ref": "#/$defs/ArtifactType" },
+        "uri": { "type": "string", "format": "uri" },
+        "content_hash": { "$ref": "#/$defs/Sha256" },
+        "locator": { "$ref": "#/$defs/Locator" },
+        "description": { "$ref": "#/$defs/NonEmptyString" }
+      }
+    },
+    "EvidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "evidence_type", "artifact_ref"],
+      "properties": {
+        "evidence_id": { "$ref": "#/$defs/Id" },
+        "evidence_type": { "$ref": "#/$defs/EvidenceType" },
+        "artifact_ref": { "$ref": "#/$defs/ArtifactRef" },
+        "excerpt_hash": { "$ref": "#/$defs/Sha256" },
+        "excerpt": { "$ref": "#/$defs/NonEmptyString" },
+        "candidate_inventory_id": { "$ref": "#/$defs/Id" }
+      }
+    },
+    "VerificationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "method", "verified_by", "verified_at"],
+      "properties": {
+        "status": { "$ref": "#/$defs/VerifiedStatus" },
+        "method": { "$ref": "#/$defs/VerificationMethod" },
+        "verified_by": { "$ref": "#/$defs/Actor" },
+        "verified_at": { "$ref": "#/$defs/Timestamp" },
+        "evidence_checked": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Id" },
+          "uniqueItems": true
+        },
+        "notes": { "$ref": "#/$defs/NonEmptyString" }
+      }
+    },
+    "ClaimBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "text", "evidence_refs"],
+      "properties": {
+        "claim_id": { "$ref": "#/$defs/Id" },
+        "text": { "$ref": "#/$defs/NonEmptyString" },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/EvidenceRef" }
+        },
+        "verification": { "$ref": "#/$defs/VerificationRecord" },
+        "notes": { "$ref": "#/$defs/NonEmptyString" }
+      }
+    },
+    "PremiseClaim": {
+      "allOf": [
+        { "$ref": "#/$defs/ClaimBase" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["satisfied", "missing", "partial"]
+            }
+          }
+        }
+      ]
+    },
+    "QualityAssertion": {
+      "allOf": [
+        { "$ref": "#/$defs/ClaimBase" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["verified", "failed", "not_verified", "partial"]
+            }
+          }
+        }
+      ]
+    },
+    "IssueFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue_id", "description", "severity"],
+      "properties": {
+        "issue_id": { "$ref": "#/$defs/Id" },
+        "description": { "$ref": "#/$defs/NonEmptyString" },
+        "severity": { "$ref": "#/$defs/Severity" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceRef" }
+        },
+        "verification": { "$ref": "#/$defs/VerificationRecord" },
+        "status": {
+          "type": "string",
+          "enum": ["open", "accepted", "remediated", "withdrawn", "escalated"]
+        }
+      }
+    },
+    "CommandVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_id", "command", "exit_code", "status"],
+      "properties": {
+        "command_id": { "$ref": "#/$defs/Id" },
+        "command": { "$ref": "#/$defs/NonEmptyString" },
+        "summary": { "$ref": "#/$defs/NonEmptyString" },
+        "exit_code": { "type": "integer", "minimum": 0 },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "not_run"]
+        },
+        "fresh": { "type": "boolean" },
+        "evidence_ref": { "$ref": "#/$defs/EvidenceRef" },
+        "verification": { "$ref": "#/$defs/VerificationRecord" }
+      }
+    },
+    "FormalConclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "derived_from_claim_ids"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "complete",
+            "not_complete",
+            "justified",
+            "needs_revision",
+            "valid",
+            "invalid",
+            "aligned",
+            "not_aligned"
+          ]
+        },
+        "summary": { "$ref": "#/$defs/NonEmptyString" },
+        "derived_from_claim_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/Id" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "CertificateEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "certificate_id",
+        "certificate_type",
+        "workflow_run_id",
+        "issue_ref",
+        "produced_by",
+        "produced_at",
+        "source_artifacts",
+        "validation_status"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/NonEmptyString" },
+        "certificate_id": { "$ref": "#/$defs/Id" },
+        "certificate_type": {
+          "type": "string",
+          "enum": [
+            "task_review",
+            "design_decision",
+            "deferred_scope",
+            "impact_alignment"
+          ]
+        },
+        "workflow_run_id": { "$ref": "#/$defs/Id" },
+        "issue_ref": { "$ref": "#/$defs/ArtifactRef" },
+        "pr_ref": { "$ref": "#/$defs/ArtifactRef" },
+        "produced_by": { "$ref": "#/$defs/Actor" },
+        "produced_at": { "$ref": "#/$defs/Timestamp" },
+        "source_artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ArtifactRef" }
+        },
+        "validation_status": {
+          "type": "string",
+          "enum": ["draft", "validated", "deficient", "clean", "superseded"]
+        },
+        "validation_notes": { "$ref": "#/$defs/NonEmptyString" },
+        "verified_claim_count": { "type": "integer", "minimum": 0 },
+        "unverified_claim_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "TaskReviewCertificate": {
+      "allOf": [
+        { "$ref": "#/$defs/CertificateEnvelope" },
+        {
+          "type": "object",
+          "required": [
+            "definition",
+            "premises",
+            "quality_assertions",
+            "verification_commands",
+            "formal_conclusion",
+            "issues"
+          ],
+          "properties": {
+            "certificate_type": { "const": "task_review" },
+            "definition": { "$ref": "#/$defs/NonEmptyString" },
+            "premises": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/PremiseClaim" }
+            },
+            "quality_assertions": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/QualityAssertion" }
+            },
+            "verification_commands": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/CommandVerification" }
+            },
+            "formal_conclusion": {
+              "allOf": [
+                { "$ref": "#/$defs/FormalConclusion" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": { "enum": ["complete", "not_complete"] }
+                  }
+                }
+              ]
+            },
+            "issues": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/IssueFinding" }
+            }
+          }
+        }
+      ]
+    },
+    "DesignComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["our_pattern", "reference_pattern", "match_status"],
+      "properties": {
+        "our_pattern": { "$ref": "#/$defs/ClaimBase" },
+        "reference_pattern": { "$ref": "#/$defs/ClaimBase" },
+        "divergence_reason": { "$ref": "#/$defs/ClaimBase" },
+        "reference_source": {
+          "type": "string",
+          "enum": ["inspect_ai", "mteb", "python_stdlib", "other"]
+        },
+        "match_status": {
+          "type": "string",
+          "enum": ["matches", "exceeds", "diverges"]
+        }
+      }
+    },
+    "DesignDecisionCertificate": {
+      "allOf": [
+        { "$ref": "#/$defs/CertificateEnvelope" },
+        {
+          "type": "object",
+          "required": ["definition", "decision_topic", "comparison", "formal_conclusion"],
+          "properties": {
+            "certificate_type": { "const": "design_decision" },
+            "definition": { "$ref": "#/$defs/NonEmptyString" },
+            "decision_topic": { "$ref": "#/$defs/NonEmptyString" },
+            "comparison": { "$ref": "#/$defs/DesignComparison" },
+            "formal_conclusion": {
+              "allOf": [
+                { "$ref": "#/$defs/FormalConclusion" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": { "enum": ["justified", "needs_revision"] }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "RoadmapPosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["milestone", "blocked_by", "blocks"],
+      "properties": {
+        "milestone": { "$ref": "#/$defs/NonEmptyString" },
+        "blocked_by": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ArtifactRef" }
+        },
+        "blocks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ArtifactRef" }
+        }
+      }
+    },
+    "DeferredEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tracked", "acceptance_criteria_clear", "roadmap_position_valid", "current_state_consistent"],
+      "properties": {
+        "tracked": { "type": "boolean" },
+        "acceptance_criteria_clear": { "type": "boolean" },
+        "roadmap_position_valid": { "type": "boolean" },
+        "current_state_consistent": { "type": "boolean" }
+      }
+    },
+    "DeferredScopeCertificate": {
+      "allOf": [
+        { "$ref": "#/$defs/CertificateEnvelope" },
+        {
+          "type": "object",
+          "required": [
+            "definition",
+            "deferred_work",
+            "tracking_issue",
+            "acceptance_criteria",
+            "roadmap_position",
+            "current_deliverable_consistency",
+            "evaluation",
+            "formal_conclusion"
+          ],
+          "properties": {
+            "certificate_type": { "const": "deferred_scope" },
+            "definition": { "$ref": "#/$defs/NonEmptyString" },
+            "deferred_work": { "$ref": "#/$defs/NonEmptyString" },
+            "tracking_issue": { "$ref": "#/$defs/ArtifactRef" },
+            "acceptance_criteria": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/NonEmptyString" }
+            },
+            "roadmap_position": { "$ref": "#/$defs/RoadmapPosition" },
+            "current_deliverable_consistency": { "$ref": "#/$defs/ClaimBase" },
+            "evaluation": { "$ref": "#/$defs/DeferredEvaluation" },
+            "formal_conclusion": {
+              "allOf": [
+                { "$ref": "#/$defs/FormalConclusion" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": { "enum": ["valid", "invalid"] }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "IssueImpactAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue_ref", "impact_status", "action", "verification"],
+      "properties": {
+        "issue_ref": { "$ref": "#/$defs/ArtifactRef" },
+        "impact_status": {
+          "type": "string",
+          "enum": ["none", "impacted", "uncertain"]
+        },
+        "impact_description": { "$ref": "#/$defs/NonEmptyString" },
+        "action": { "$ref": "#/$defs/NonEmptyString" },
+        "verification": { "$ref": "#/$defs/VerificationRecord" }
+      }
+    },
+    "DocumentationImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_ref", "status"],
+      "properties": {
+        "document_ref": { "$ref": "#/$defs/ArtifactRef" },
+        "status": {
+          "type": "string",
+          "enum": ["none", "updated", "follow_up_required"]
+        },
+        "description": { "$ref": "#/$defs/NonEmptyString" },
+        "verification": { "$ref": "#/$defs/VerificationRecord" }
+      }
+    },
+    "ImpactAlignmentCertificate": {
+      "allOf": [
+        { "$ref": "#/$defs/CertificateEnvelope" },
+        {
+          "type": "object",
+          "required": [
+            "definition",
+            "roadmap_impacts",
+            "open_issue_scan",
+            "documentation_impacts",
+            "dependency_graph",
+            "formal_conclusion"
+          ],
+          "properties": {
+            "certificate_type": { "const": "impact_alignment" },
+            "definition": { "$ref": "#/$defs/NonEmptyString" },
+            "roadmap_impacts": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/IssueImpactAssessment" }
+            },
+            "open_issue_scan": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/IssueImpactAssessment" }
+            },
+            "documentation_impacts": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/DocumentationImpact" }
+            },
+            "dependency_graph": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["unblocked_issues", "blocked_by_updates", "new_issues"],
+              "properties": {
+                "unblocked_issues": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/ArtifactRef" }
+                },
+                "blocked_by_updates": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/ArtifactRef" }
+                },
+                "new_issues": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/ArtifactRef" }
+                },
+                "post_merge_actions": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/NonEmptyString" }
+                }
+              }
+            },
+            "formal_conclusion": {
+              "allOf": [
+                { "$ref": "#/$defs/FormalConclusion" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": { "enum": ["aligned", "not_aligned"] }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "DisputeObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dispute_id",
+        "target_certificate_id",
+        "target_claim_id",
+        "filed_by",
+        "dispute_type",
+        "status",
+        "rationale",
+        "source_refs"
+      ],
+      "properties": {
+        "dispute_id": { "$ref": "#/$defs/Id" },
+        "target_certificate_id": { "$ref": "#/$defs/Id" },
+        "target_claim_id": { "$ref": "#/$defs/Id" },
+        "filed_by": { "$ref": "#/$defs/Actor" },
+        "against_actor": { "$ref": "#/$defs/Actor" },
+        "validator": { "$ref": "#/$defs/Actor" },
+        "arbiter": { "$ref": "#/$defs/Actor" },
+        "dispute_type": {
+          "type": "string",
+          "enum": [
+            "wrong_dependency",
+            "wrong_scope",
+            "wrong_evidence",
+            "missing_verification",
+            "missing_claim",
+            "invalid_comparison",
+            "invalid_deferral",
+            "invalid_none_claim",
+            "state_transition_violation",
+            "other"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "filed",
+            "confirmed_by_validator",
+            "disputed_by_validator",
+            "upheld",
+            "overturned",
+            "withdrawn",
+            "inconclusive",
+            "escalated"
+          ]
+        },
+        "rationale": { "$ref": "#/$defs/NonEmptyString" },
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/EvidenceRef" }
+        },
+        "proposed_fix": { "$ref": "#/$defs/NonEmptyString" },
+        "arbiter_ruling": { "$ref": "#/$defs/NonEmptyString" },
+        "penalty_points": { "type": "integer" }
+      }
+    },
+    "GateEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "requirement", "status"],
+      "properties": {
+        "gate_id": { "$ref": "#/$defs/Id" },
+        "requirement": { "$ref": "#/$defs/NonEmptyString" },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "waived", "not_evaluated"]
+        },
+        "verifier_artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ArtifactRef" }
+        },
+        "notes": { "$ref": "#/$defs/NonEmptyString" }
+      }
+    },
+    "TransitionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "workflow_run_id",
+        "from_state",
+        "to_state",
+        "requested_by",
+        "required_artifacts",
+        "gate_evaluations",
+        "status"
+      ],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/Id" },
+        "workflow_run_id": { "$ref": "#/$defs/Id" },
+        "from_state": { "$ref": "#/$defs/WorkflowState" },
+        "to_state": { "$ref": "#/$defs/WorkflowState" },
+        "requested_by": { "$ref": "#/$defs/Actor" },
+        "requested_at": { "$ref": "#/$defs/Timestamp" },
+        "required_artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ArtifactRef" }
+        },
+        "gate_evaluations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/GateEvaluation" }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["requested", "approved", "rejected"]
+        },
+        "decided_by": { "$ref": "#/$defs/Actor" },
+        "decision_notes": { "$ref": "#/$defs/NonEmptyString" }
+      }
+    },
+    "RemediationLogEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "timestamp",
+        "author",
+        "action",
+        "deficiency_id",
+        "content",
+        "prev_hash",
+        "signature"
+      ],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "timestamp": { "$ref": "#/$defs/Timestamp" },
+        "author": { "$ref": "#/$defs/AuthorKind" },
+        "action": {
+          "type": "string",
+          "enum": [
+            "file",
+            "confirm",
+            "dispute",
+            "evidence",
+            "accept",
+            "reject",
+            "arbitrate",
+            "rebuttal",
+            "withdraw",
+            "escalate"
+          ]
+        },
+        "deficiency_id": { "$ref": "#/$defs/Id" },
+        "content": { "$ref": "#/$defs/NonEmptyString" },
+        "prev_hash": { "$ref": "#/$defs/Sha256" },
+        "signature": { "$ref": "#/$defs/NonEmptyString" },
+        "content_hash": { "$ref": "#/$defs/Sha256" },
+        "authority_verified": { "type": "boolean" },
+        "signature_verified": { "type": "boolean" },
+        "hash_chain_verified": { "type": "boolean" }
+      }
+    },
+    "RemediationLog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["log_id", "certificate_id", "certificate_status", "entries"],
+      "properties": {
+        "log_id": { "$ref": "#/$defs/Id" },
+        "certificate_id": { "$ref": "#/$defs/Id" },
+        "certificate_status": {
+          "type": "string",
+          "enum": ["deficient", "clean"]
+        },
+        "open_deficiency_count": { "type": "integer", "minimum": 0 },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RemediationLogEntry" }
+        }
+      }
+    },
+    "WorkflowEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "run_id",
+        "orchestration_version",
+        "workflow_step",
+        "executor_type",
+        "status",
+        "started_at",
+        "ended_at"
+      ],
+      "properties": {
+        "event_id": { "$ref": "#/$defs/Id" },
+        "run_id": { "$ref": "#/$defs/Id" },
+        "parent_run_id": { "$ref": "#/$defs/Id" },
+        "orchestration_version": { "$ref": "#/$defs/NonEmptyString" },
+        "skills_hash": { "$ref": "#/$defs/Sha256" },
+        "policy_hash": { "$ref": "#/$defs/Sha256" },
+        "workflow_step": { "$ref": "#/$defs/NonEmptyString" },
+        "state": { "$ref": "#/$defs/WorkflowState" },
+        "executor_type": { "$ref": "#/$defs/ExecutorType" },
+        "status": {
+          "type": "string",
+          "enum": ["pass", "fail", "skip"]
+        },
+        "exit_code": { "type": "integer" },
+        "tokens_in": { "type": "integer", "minimum": 0 },
+        "tokens_out": { "type": "integer", "minimum": 0 },
+        "llm_cost_usd": { "type": "number", "minimum": 0 },
+        "compute_seconds": { "type": "number", "minimum": 0 },
+        "ci_minutes_est": { "type": "number", "minimum": 0 },
+        "compute_cost_usd": { "type": "number", "minimum": 0 },
+        "human_minutes": { "type": "number", "minimum": 0 },
+        "human_cost_usd": { "type": "number", "minimum": 0 },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ArtifactRef" }
+        },
+        "started_at": { "$ref": "#/$defs/Timestamp" },
+        "ended_at": { "$ref": "#/$defs/Timestamp" },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "complexity_bucket": {
+          "type": "string",
+          "enum": ["small", "medium", "large", "unknown"]
+        },
+        "changed_loc": { "type": "integer", "minimum": 0 },
+        "files_changed": { "type": "integer", "minimum": 0 },
+        "tests_added": { "type": "integer", "minimum": 0 },
+        "story_points": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

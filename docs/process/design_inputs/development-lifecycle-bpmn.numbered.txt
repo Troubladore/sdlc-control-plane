@@ -1,0 +1,760 @@
+     1	# Development Lifecycle — Camunda Process Definition
+     2	
+     3	> Companion to [Certificate-Driven Development](certificate-driven-development.md).
+     4	> This document defines the executable process model for implementation in
+     5	> Camunda (BPMN 2.0). Certificate templates are defined in the companion doc;
+     6	> this doc defines when, where, and how they are produced and evaluated.
+     7	
+     8	---
+     9	
+    10	## 1. Process Overview
+    11	
+    12	```
+    13	┌─────────────────────────────────────────────────────────────────────────┐
+    14	│                        ISSUE LIFECYCLE                                  │
+    15	│                                                                         │
+    16	│  Triage ──→ Design ──→ Plan ──→ Implement ──→ Review ──→ Integrate     │
+    17	│    │          │         │          │             │           │          │
+    18	│    ▼          ▼         ▼          ▼             ▼           ▼          │
+    19	│  Backlog   Design    Plan       Feature       PR on       Merged to    │
+    20	│  Board     Doc       Doc        Branch        Epic        Epic/Main    │
+    21	│            + DDCs    + Tasks    + Code        + TRC                    │
+    22	│                                + Tests       + DSCs                    │
+    23	│                                + Certs                                 │
+    24	└─────────────────────────────────────────────────────────────────────────┘
+    25	
+    26	DDC = Design Decision Certificate
+    27	TRC = Task Review Certificate
+    28	DSC = Deferred Scope Certificate
+    29	```
+    30	
+    31	---
+    32	
+    33	## 2. Roles
+    34	
+    35	| Role | Shorthand | Responsibilities |
+    36	|------|-----------|-----------------|
+    37	| **Architect** | A | Domain knowledge, contracts, spikes, design decisions, PR review |
+    38	| **Lead Engineer** | L | Execution, TDD, implementation, documentation |
+    39	| **Reviewer** | R | Certificate evaluation (may be A, L, or external) |
+    40	
+    41	Both A and L may implement. Role labels on issues indicate primary ownership.
+    42	
+    43	---
+    44	
+    45	## 3. Process Phases
+    46	
+    47	### Phase 1: Triage
+    48	
+    49	**Trigger:** New issue created or identified from roadmap.
+    50	
+    51	**Activities:**
+    52	1. Assign to milestone (MS1–MS5 or Decoupled Backlog)
+    53	2. Set labels: Type, Role, Priority
+    54	3. Verify dependency graph (blocked-by / blocks)
+    55	4. Set Sequence field on project board
+    56	
+    57	**Gate → Phase 2:**
+    58	- Issue has milestone, labels, and dependencies documented
+    59	- Issue is not blocked by incomplete upstream work
+    60	
+    61	**Artifacts:** GitHub issue with structured fields.
+    62	
+    63	---
+    64	
+    65	### Phase 2: Design (for Contract/Spike/Architecture issues)
+    66	
+    67	**Trigger:** Issue moves to "In Progress" for Contract or Spike type.
+    68	
+    69	**Subprocess: Brainstorming**
+    70	```
+    71	Explore Context ──→ Clarifying Questions ──→ Propose Approaches
+    72	      │                    │                       │
+    73	      ▼                    ▼                       ▼
+    74	  Read issue,         One question           2-3 options with
+    75	  codebase,           at a time,             trade-offs and
+    76	  reference repos     understand intent      recommendation
+    77	                                                   │
+    78	                                                   ▼
+    79	                                          Present Design ──→ Approval
+    80	                                                   │
+    81	                                                   ▼
+    82	                                          Design Decision Certificates
+    83	```
+    84	
+    85	**Decision Framework:**
+    86	For each design choice, evaluate through these lenses (priority order):
+    87	1. **Quality is job 1** — prefer more work for a more professional result
+    88	2. **Clean, approachable, professional, comprehensible** — how it looks to adopters
+    89	3. **Inspect-sibling feel** — match Inspect AI patterns exactly
+    90	4. **Researcher delight** — least surprise, one pattern to learn
+    91	5. **Dog-food our own mechanisms** — built-in and third-party use same paths
+    92	6. **Explicit over magic** — ceremony that communicates intent over hidden behavior
+    93	
+    94	**Gate → Phase 3:**
+    95	- Design document saved to `docs/plans/YYYY-MM-DD-issue-NNN-<topic>-design.md`
+    96	- Design Decision Certificates produced for each architectural choice
+    97	- User has approved the design
+    98	
+    99	**Artifacts:**
+   100	- Design document (committed)
+   101	- Design Decision Certificates (in design doc or separate)
+   102	
+   103	---
+   104	
+   105	### Phase 3: Planning
+   106	
+   107	**Trigger:** Design approved (or skip Phase 2 for Implementation issues).
+   108	
+   109	**Activities:**
+   110	1. Write implementation plan with bite-sized tasks (2-5 min each)
+   111	2. Each task specifies: files, TDD steps (red/green), exact commands, commit message
+   112	3. Save to `docs/plans/YYYY-MM-DD-issue-NNN-<topic>-plan.md`
+   113	
+   114	**Plan Document Structure:**
+   115	```
+   116	# [Feature] Implementation Plan
+   117	
+   118	> For Claude: REQUIRED SUB-SKILL: Use executing-plans
+   119	
+   120	Goal: [one sentence]
+   121	Architecture: [2-3 sentences]
+   122	Tech Stack: [key technologies]
+   123	
+   124	### Task N: [Component Name]
+   125	Files: [create/modify/test paths]
+   126	Step 1: Write failing test [code]
+   127	Step 2: Run test, verify FAIL [command + expected output]
+   128	Step 3: Write minimal implementation [code]
+   129	Step 4: Run test, verify PASS [command + expected output]
+   130	Step 5: Commit [exact message]
+   131	```
+   132	
+   133	**Gate → Phase 4:**
+   134	- Plan document committed
+   135	- All tasks have explicit TDD steps
+   136	- User has chosen execution approach (subagent-driven or parallel session)
+   137	
+   138	**Artifacts:**
+   139	- Implementation plan (committed)
+   140	
+   141	---
+   142	
+   143	### Phase 4: Implementation
+   144	
+   145	**Trigger:** Plan approved.
+   146	
+   147	**Subprocess: Per-Task Cycle**
+   148	```
+   149	                    ┌──────────────────────────────┐
+   150	                    │     PER-TASK CYCLE            │
+   151	                    │                               │
+   152	                    │  Write Failing Test (RED)     │
+   153	                    │         │                     │
+   154	                    │         ▼                     │
+   155	                    │  Verify Test Fails            │
+   156	                    │  (show output)                │
+   157	                    │         │                     │
+   158	                    │         ▼                     │
+   159	                    │  Write Minimal Code (GREEN)   │
+   160	                    │         │                     │
+   161	                    │         ▼                     │
+   162	                    │  Verify Test Passes           │
+   163	                    │  (show output)                │
+   164	                    │         │                     │
+   165	                    │         ▼                     │
+   166	                    │  Refactor (stay green)        │
+   167	                    │         │                     │
+   168	                    │         ▼                     │
+   169	                    │  Commit (conventional msg)    │
+   170	                    │         │                     │
+   171	                    │         ▼                     │
+   172	                    │  Self-Review                  │
+   173	                    │  - Completeness               │
+   174	                    │  - Quality                    │
+   175	                    │  - Discipline (YAGNI)         │
+   176	                    │  - Test coverage              │
+   177	                    │         │                     │
+   178	                    │         ▼                     │
+   179	                    │  Next Task or Phase 4b        │
+   180	                    └──────────────────────────────┘
+   181	```
+   182	
+   183	**TDD Iron Law:** No production code without a failing test first. If code was
+   184	written before the test, delete it and start over.
+   185	
+   186	**Branching:**
+   187	- Feature branch from current epic: `feat/ms{N}-{description}`
+   188	- All commits signed
+   189	- Conventional commit prefixes: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`
+   190	
+   191	**Gate → Phase 4b (Simplify):**
+   192	- All plan tasks completed
+   193	- All tests pass (fresh output)
+   194	- All commits on feature branch
+   195	
+   196	---
+   197	
+   198	### Phase 4b: Simplify
+   199	
+   200	**Trigger:** All implementation tasks complete.
+   201	
+   202	**Activities (three parallel review agents):**
+   203	
+   204	| Agent | Focus | Looks For |
+   205	|-------|-------|-----------|
+   206	| Code Reuse | Existing utilities | Duplicated functionality, missed reuse |
+   207	| Code Quality | Hacky patterns | Redundant state, copy-paste, leaky abstractions |
+   208	| Efficiency | Unnecessary work | Hot-path bloat, double registration, N+1 |
+   209	
+   210	**For every finding:**
+   211	1. Fix it directly, OR
+   212	2. Produce a Deferred Scope Certificate with tracking issue
+   213	
+   214	**"Pre-existing" is not an excuse.** Fix it or track it.
+   215	
+   216	**Gate → Phase 5:**
+   217	- All findings addressed (fixed or certified-deferred)
+   218	- Lint clean: `uv run ruff check`
+   219	- Type clean: `uv run mypy`
+   220	- Tests pass: `uv run pytest`
+   221	- All outputs shown fresh, not claimed from memory
+   222	
+   223	---
+   224	
+   225	### Phase 5: Certificate Review
+   226	
+   227	**Trigger:** Simplify complete.
+   228	
+   229	**This is a single integrated pass** — not a separate spec review + quality
+   230	review + certificate check. One pass, one certificate.
+   231	
+   232	**Produce: Task Review Certificate**
+   233	```
+   234	TASK REVIEW CERTIFICATE
+   235	
+   236	DEFINITIONS:
+   237	D1: Task is COMPLETE iff all spec requirements are satisfied
+   238	    AND code quality meets project standards.
+   239	
+   240	PREMISES (from issue acceptance criteria):
+   241	P1: [requirement] → Evidence: [file:line] → [SATISFIED/MISSING]
+   242	...
+   243	
+   244	CODE QUALITY ASSERTIONS:
+   245	Q1: TDD verified → Evidence: [commit SHAs: red, green]
+   246	Q2: No regressions → Evidence: [pytest output]
+   247	Q3: Follows codebase patterns → Evidence: [file:line comparison]
+   248	Q4: YAGNI → Evidence: [diff scope vs spec scope]
+   249	Q5: Exceeds reference (Inspect AI) where applicable → Evidence: [comparison]
+   250	
+   251	VERIFICATION COMMANDS:
+   252	V1: uv run pytest → [N passed, M skipped, exit 0]
+   253	V2: uv run ruff check → [All checks passed]
+   254	V3: uv run mypy → [Success: no issues found]
+   255	
+   256	FORMAL CONCLUSION:
+   257	By D1, since P1..PN are [SATISFIED] and Q1..QN are [VERIFIED],
+   258	task is [COMPLETE/NOT COMPLETE].
+   259	
+   260	ISSUES: [none / list with severity]
+   261	```
+   262	
+   263	**Produce: Design Decision Certificates** (if design choices were made)
+   264	
+   265	**Produce: Deferred Scope Certificates** (if any work was deferred)
+   266	
+   267	**Gate → Phase 6 (if COMPLETE):**
+   268	- Task Review Certificate: all premises SATISFIED
+   269	- All Design Decision Certificates: JUSTIFIED
+   270	- All Deferred Scope Certificates: VALID
+   271	- No Critical or Important issues unresolved
+   272	
+   273	**Gate → Phase 4 (if NOT COMPLETE):**
+   274	- Certificate identifies specific issues
+   275	- Loop back to Implementation with explicit items
+   276	
+   277	---
+   278	
+   279	### Phase 6: Integration
+   280	
+   281	**Trigger:** Certificate Review passes.
+   282	
+   283	**Activities:**
+   284	1. Produce Impact Alignment Certificate (scan ALL open issues, roadmap, docs)
+   285	2. **Validate** Impact Alignment Certificate (see Certificate Validation below)
+   286	3. Push feature branch
+   287	4. Create PR targeting epic branch (not main)
+   288	5. PR body includes or links to all certificates (Task Review, Design Decision, Deferred Scope, Impact Alignment)
+   289	6. Request review
+   290	
+   291	**PR Structure:**
+   292	```markdown
+   293	## Summary
+   294	- [2-3 bullets]
+   295	
+   296	## Certificates
+   297	- Task Review Certificate: [link or inline]
+   298	- Design Decision Certificates: [link or inline]
+   299	- Deferred Scope Certificates: [link or inline, with issue refs]
+   300	- Impact Alignment Certificate: [link or inline]
+   301	
+   302	## Test Plan
+   303	- [ ] [verification steps]
+   304	
+   305	Closes #N
+   306	```
+   307	
+   308	**Gate → Complete:**
+   309	- PR reviewed and approved by maintainer
+   310	- Maintainer squash-merges (their prerogative)
+   311	- Feature branch deleted
+   312	- Issue closed by maintainer
+   313	
+   314	**Post-merge:**
+   315	- Execute post-merge actions from Impact Alignment Certificate (e.g., comment on roadmap issue)
+   316	- Update project board
+   317	- Update issue map in project memory
+   318	- Sync epic branch if needed
+   319	
+   320	---
+   321	
+   322	## 4. Certificate Validation
+   323	
+   324	> Producing a certificate without validating it is the same as not having one.
+   325	
+   326	Every certificate must pass through a validation step after production. This
+   327	is where hand-waving and lazy claims get caught. The validation step is NOT
+   328	optional — it is a gate in the process.
+   329	
+   330	### The Validation Protocol
+   331	
+   332	```
+   333	FOR EACH claim in the certificate:
+   334	
+   335	1. IDENTIFY the evidence cited (file:line, issue #, command output)
+   336	2. GO TO the source — read the actual file, issue body, or output
+   337	3. VERIFY the claim matches what the source actually says
+   338	4. RECORD what you verified in a "Verified" column or annotation
+   339	
+   340	If ANY claim fails verification:
+   341	  → Fix the certificate
+   342	  → Re-validate the fixed claim
+   343	  → Document what was wrong and how it was caught
+   344	```
+   345	
+   346	### Why This Step Exists
+   347	
+   348	During PR #113 (the first PR under this process), the Impact Alignment
+   349	Certificate was produced and committed without validation. When challenged,
+   350	re-reading the actual issue bodies revealed 3 errors:
+   351	
+   352	| Original Claim | Actual Evidence | Error Type |
+   353	|----------------|-----------------|------------|
+   354	| #89 "partially unblocked, needs #104" | Issue body says blocked by #81 + #86. #81 is CLOSED. | **Wrong dependency** — didn't read the issue |
+   355	| #72 "RELATED — mirrors our entry-point pattern" | Issue is about Inspect *task* entry points, not embedder entry points | **Wrong scope** — assumed from title, didn't read body |
+   356	| All rows lacked verification evidence | No "Verified" column | **No audit trail** — claims were unverifiable |
+   357	
+   358	These errors were caught ONLY because someone asked "did we validate?"
+   359	Without the validation step, incorrect claims ship as fact.
+   360	
+   361	### Certificate Types and Their Validation Focus
+   362	
+   363	| Certificate | Key Validation Focus |
+   364	|-------------|---------------------|
+   365	| Task Review | Re-run every verification command. Re-read every file:line cited. |
+   366	| Design Decision | Re-read the reference source code cited. Verify the comparison is accurate. |
+   367	| Deferred Scope | Open the tracking issue URL. Verify acceptance criteria match what's claimed. |
+   368	| Impact Alignment | **Read the body of every issue claimed as NONE/impacted.** Title-scanning is insufficient. |
+   369	
+   370	### The Impact Alignment Trap
+   371	
+   372	Impact Alignment Certificates are the most vulnerable to lazy production
+   373	because they involve scanning many issues. The temptation is to scan titles
+   374	and write "NONE" for everything that doesn't obviously match. This is
+   375	exactly the failure mode that semi-formal certificates are designed to prevent.
+   376	
+   377	**Required evidence for "NONE" impact claims:**
+   378	- For issues in the same milestone: read the issue body
+   379	- For issues in adjacent milestones that touch the same subsystem: read the issue body
+   380	- For issues clearly in a different domain (titles confirm): title-level scan acceptable, noted as "Titles confirm scope"
+   381	- For issues where you're uncertain: read the issue body
+   382	
+   383	**The "Verified" column is mandatory.** Every row must state what was examined.
+   384	
+   385	### Competitive Multi-Model Review
+   386	
+   387	Certificate validation is performed by **two independent LLM reviewers**
+   388	(different model families) who competitively produce and cross-validate
+   389	certificates. A third model serves as final arbiter.
+   390	
+   391	**Roles:**
+   392	
+   393	| Role | Model | Responsibility |
+   394	|------|-------|----------------|
+   395	| Reviewer A | OpenAI Codex | Independently produce certificate, then validate Reviewer B's |
+   396	| Reviewer B | Google Gemini | Independently produce certificate, then validate Reviewer A's |
+   397	| Arbiter | Claude Code | Final judge — verifies disputed claims from both reviewers |
+   398	
+   399	**Process:**
+   400	
+   401	```
+   402	┌──────────────────────────────────────────────────────────┐
+   403	│               COMPETITIVE REVIEW CYCLE                    │
+   404	│                                                           │
+   405	│  1. PRODUCE (parallel)                                    │
+   406	│     Reviewer A ──→ Certificate A                          │
+   407	│     Reviewer B ──→ Certificate B                          │
+   408	│                                                           │
+   409	│  2. CROSS-VALIDATE (parallel)                             │
+   410	│     Reviewer A reads Certificate B ──→ Dispute Report A   │
+   411	│     Reviewer B reads Certificate A ──→ Dispute Report B   │
+   412	│                                                           │
+   413	│  3. ARBITRATE (sequential)                                │
+   414	│     Arbiter (Claude Code):                                │
+   415	│       - For each dispute: verify against source           │
+   416	│       - Determine: Valid catch / False dispute             │
+   417	│       - Score both reviewers                              │
+   418	│                                                           │
+   419	│  4. MERGE                                                 │
+   420	│     Produce final certificate from best claims of both    │
+   421	│     with all disputes resolved                            │
+   422	└──────────────────────────────────────────────────────────┘
+   423	```
+   424	
+   425	**Incentive Structure:**
+   426	
+   427	| Event | Token Reward | Notes |
+   428	|-------|-------------|-------|
+   429	| Producing a certificate with zero disputes | +100 | Clean work |
+   430	| Catching a genuine error in other reviewer's certificate | +200 | Bug bounty |
+   431	| Catching a false "NONE" claim (lazy title-scanning) | +300 | Highest-value catch |
+   432	| Filing a false dispute (claim was actually correct) | **-600** | Triple penalty — discourages gaming |
+   433	| Missing an error that the other reviewer caught | -100 | Incentivizes thoroughness |
+   434	
+   435	The **triple penalty** for false disputes is critical. Without it, reviewers
+   436	are incentivized to dispute everything hoping to score bounties. The penalty
+   437	must exceed the reward by enough to make frivolous disputes costly.
+   438	
+   439	**Leaderboard:**
+   440	
+   441	Maintained as a persistent artifact in `docs/process/reviewer-leaderboard.md`:
+   442	
+   443	```markdown
+   444	# Certificate Review Leaderboard
+   445	
+   446	| Reviewer | Certificates | Clean (0 disputes) | Bugs Caught | False Disputes | Score |
+   447	|----------|-------------|---------------------|-------------|----------------|-------|
+   448	| Codex    | 5           | 3                   | 4           | 1              | +1100 |
+   449	| Gemini   | 5           | 2                   | 2           | 0              | +600  |
+   450	
+   451	## Dispute Log
+   452	
+   453	| PR | Dispute | Filed By | Ruling | Detail |
+   454	|----|---------|----------|--------|--------|
+   455	| #113 | #89 dependency claim | Gemini | VALID catch | Codex said "needs #104", issue says #81 |
+   456	| #113 | Q3 pattern claim | Codex | FALSE dispute (-600) | Gemini's claim was correct per file:line |
+   457	```
+   458	
+   459	**Arbiter Protocol:**
+   460	
+   461	When Claude Code arbitrates a dispute:
+   462	
+   463	1. Read the disputed claim from both certificates
+   464	2. Go to the cited source (file, issue, command output)
+   465	3. Determine which reviewer's claim matches the source
+   466	4. If ambiguous: flag as INCONCLUSIVE (no reward, no penalty for either)
+   467	5. Record ruling with evidence in the dispute log
+   468	
+   469	**When to use competitive review vs. single review:**
+   470	
+   471	| Scenario | Review Mode |
+   472	|----------|------------|
+   473	| Feature PR (new code) | Competitive — both models review |
+   474	| Documentation-only PR | Single reviewer sufficient |
+   475	| Hotfix (< 20 lines changed) | Single reviewer sufficient |
+   476	| Epic-level PR (large scope) | Competitive — mandatory |
+   477	| Any PR touching process docs | Competitive — mandatory |
+   478	
+   479	### Remediation Protocol — Chain of Custody
+   480	
+   481	When a certificate identifies deficiencies, those deficiencies must be
+   482	tracked through a structured remediation cycle with **separation of duty**.
+   483	The model that filed the deficiency is the only authority that can accept
+   484	the remediation. The implementer cannot mark their own fix as accepted.
+   485	
+   486	**Roles in remediation:**
+   487	
+   488	| Role | Who | Responsibility |
+   489	|------|-----|----------------|
+   490	| **Implementer** | Claude Code | Writes code, produces initial certificates, provides remediation evidence |
+   491	| **Finder** | Codex or Gemini (whoever filed) | Owns the deficiency. Must accept or reject remediation evidence. |
+   492	| **Validator** | The other reviewer (not the finder) | Cross-validates the deficiency claim. Confirms or disputes. |
+   493	| **Arbiter** | Claude Code (wearing arbiter hat) | Breaks ties between Finder and Validator. Cannot arbitrate own implementation. |
+   494	| **Human** | Project maintainer | Final escalation when all models deadlock. |
+   495	
+   496	**Deficiency lifecycle:**
+   497	
+   498	```
+   499	1. FILED
+   500	   Finder identifies deficiency in certificate.
+   501	   Validator cross-checks.
+   502	       │
+   503	       ├── Validator CONFIRMS → deficiency ACCEPTED
+   504	       │   Finder owns acceptance authority.
+   505	       │
+   506	       └── Validator DISPUTES → goes to Arbiter
+   507	           │
+   508	           ├── Arbiter UPHOLDS → deficiency ACCEPTED
+   509	           │   Finder owns acceptance authority.
+   510	           │
+   511	           └── Arbiter OVERTURNS → Finder gets ONE rebuttal
+   512	               │
+   513	               ├── Rebuttal CONVINCES (Validator + Arbiter agree) →
+   514	               │   deficiency WITHDRAWN, no penalty
+   515	               │
+   516	               └── Rebuttal FAILS →
+   517	                   Finder must WITHDRAW claim.
+   518	                   False dispute penalty applied (-600).
+   519	
+   520	2. ACCEPTED
+   521	   Implementer provides remediation evidence.
+   522	   Evidence must include:
+   523	     - What was done (commit SHA, file:line diff)
+   524	     - Proof it resolves the issue (test output, re-read of source)
+   525	       │
+   526	       ├── Finder ACCEPTS evidence → deficiency REMEDIATED
+   527	       │
+   528	       └── Finder REJECTS evidence (with reason) →
+   529	           Implementer must provide new evidence.
+   530	           If Implementer believes rejection is unfair → Arbiter rules.
+   531	           If Arbiter + Implementer + Finder deadlock → ESCALATE TO HUMAN.
+   532	
+   533	3. REMEDIATED
+   534	   Deficiency is closed. Certificate status updated.
+   535	   When all deficiencies reach REMEDIATED → certificate is CLEAN.
+   536	
+   537	4. ESCALATED
+   538	   Human arbitrates. Human's decision is final.
+   539	   Recorded in remediation log with human's reasoning.
+   540	```
+   541	
+   542	**Remediation Log structure** (appended to the certificate that found issues):
+   543	
+   544	```
+   545	REMEDIATION LOG
+   546	
+   547	Certificate Status: [DEFICIENT (N open) / CLEAN (all remediated)]
+   548	
+   549	R1: [Claim ID from certificate]
+   550	  Filed by: [Codex/Gemini]
+   551	  Cross-validated by: [Gemini/Codex] — [CONFIRMED/DISPUTED]
+   552	  Arbiter ruling: [N/A / UPHELD / OVERTURNED]
+   553	  Deficiency: [description of what was wrong]
+   554	  Status: [ACCEPTED / REMEDIATED / WITHDRAWN / ESCALATED]
+   555	
+   556	  Remediation evidence (if ACCEPTED → REMEDIATED):
+   557	    Action: [commit SHA] [file:line description]
+   558	    Proof: [test output / re-read evidence]
+   559	    Accepted by: [Finder model name] on [date]
+   560	
+   561	  Rebuttal (if OVERTURNED → rebuttal attempted):
+   562	    Finder's argument: [text]
+   563	    Ruling: [CONVINCES / FAILS]
+   564	    Penalty applied: [YES -600 / NO]
+   565	
+   566	R2: ...
+   567	```
+   568	
+   569	**The certificate cannot reach CLEAN status until:**
+   570	- Every ACCEPTED deficiency has REMEDIATED status
+   571	- Every remediation has been accepted by the original Finder
+   572	- The Remediation Log is committed with all evidence
+   573	
+   574	**Tamper-proof log requirement:**
+   575	
+   576	The Remediation Log is an **append-only, signed ledger**. No entry can be
+   577	modified or deleted after it is written. This prevents a model from
+   578	rewriting history, forging another model's acceptance, or silently
+   579	removing a deficiency.
+   580	
+   581	Properties (detailed design in #114):
+   582	
+   583	1. **Append-only:** New entries are appended. Prior entries are immutable.
+   584	   No edits, no deletions, no reordering. Like a write-ahead log or a
+   585	   blockchain — forward-only.
+   586	
+   587	2. **Signed entries:** Each log entry is signed by the model that authored
+   588	   it. A Finder's acceptance entry must be signed by the Finder. An
+   589	   Implementer's evidence entry must be signed by the Implementer.
+   590	   Signatures must be verifiable by any party.
+   591	
+   592	3. **Hash-chained:** Each entry includes a hash of the previous entry,
+   593	   forming a tamper-evident chain. Inserting, removing, or modifying an
+   594	   entry breaks the chain. Any participant can verify integrity by
+   595	   replaying the hash chain.
+   596	
+   597	4. **Entry structure:**
+   598	   ```
+   599	   ENTRY {
+   600	     sequence: int              # Monotonically increasing
+   601	     timestamp: ISO-8601
+   602	     author: enum               # "codex" | "gemini" | "claude" | "human"
+   603	     action: enum               # "file" | "confirm" | "dispute" | "evidence"
+   604	                                # | "accept" | "reject" | "arbitrate"
+   605	                                # | "rebuttal" | "withdraw" | "escalate"
+   606	     deficiency_id: string
+   607	     content: string            # The claim, evidence, or ruling
+   608	     prev_hash: string          # SHA-256 of previous entry
+   609	     signature: string          # Model-specific signature of this entry
+   610	   }
+   611	   ```
+   612	
+   613	5. **Verification:** Before accepting any log entry, the receiving party
+   614	   MUST verify: (a) the `prev_hash` chains correctly, (b) the `signature`
+   615	   matches the claimed `author`, (c) the `author` has authority for the
+   616	   `action` (e.g., only Finder can `accept`).
+   617	
+   618	6. **Storage:** The log is committed to git as part of the certificate
+   619	   file. Git's own SHA integrity provides a secondary tamper-evidence
+   620	   layer, but the hash chain is the primary mechanism (survives
+   621	   cherry-picks, rebases, and non-git transports).
+   622	
+   623	The exact signing mechanism (API-key-derived HMAC, asymmetric keys per
+   624	model, or Camunda-managed tokens) is a design decision for the #114
+   625	implementation. The requirement here is the **property**: no model can
+   626	forge another model's entries or alter the history.
+   627	
+   628	**Anti-patterns:**
+   629	
+   630	| Pattern | Problem | Fix |
+   631	|---------|---------|-----|
+   632	| Implementer marks own deficiency as remediated | No separation of duty | Finder must accept; signature enforced |
+   633	| "Fixed in commit X" with no proof | Claim without evidence | Must include test output or re-verification |
+   634	| Finder rubber-stamps all remediations | Lazy acceptance | Arbiter spot-checks acceptance quality |
+   635	| Model rewrites prior log entry | History tampering | Hash chain breaks; detected on verification |
+   636	| Model forges another model's signature | Identity spoofing | Signature verification rejects entry |
+   637	| Endless dispute loop | Process deadlock | Max one rebuttal, then human escalation |
+   638	| Deficiency left in ACCEPTED forever | Forgotten work | Timer event: 24hr warning, 48hr escalation |
+   639	
+   640	---
+   641	
+   642	## 5. Certificate Production Rules
+   643	
+   644	### When Each Certificate is Required
+   645	
+   646	| Trigger | Certificate | Who Produces | Where Stored |
+   647	|---------|------------|--------------|--------------|
+   648	| Implementation complete | Task Review | Implementer | PR body or `docs/plans/` |
+   649	| Architectural choice made | Design Decision | Architect | Design doc in `docs/plans/` |
+   650	| Work deferred | Deferred Scope | Anyone | PR body or `docs/plans/`, with issue link |
+   651	| PR ready to submit | Impact Alignment | Implementer | PR body or `docs/plans/` |
+   652	| PR submitted | All applicable (validated) | Implementer | PR body |
+   653	
+   654	### Certificate Evaluation Criteria
+   655	
+   656	**Task Review Certificate passes when:**
+   657	- Every premise from the issue acceptance criteria maps to a SATISFIED entry
+   658	- Every quality assertion has fresh command output as evidence
+   659	- No Critical or Important issues remain open
+   660	
+   661	**Design Decision Certificate passes when:**
+   662	- MATCHES or EXCEEDS reference implementation, with file:line evidence
+   663	- If DIVERGES: documented justification that ours is demonstrably better
+   664	
+   665	**Deferred Scope Certificate passes when:**
+   666	- Tracking issue exists with clear acceptance criteria
+   667	- Issue is positioned in the correct milestone with correct dependencies
+   668	- Current deliverable is internally consistent without the deferred work
+   669	
+   670	**Impact Alignment Certificate passes when:**
+   671	- Every open issue has been assessed (not just title-scanned — see Section 4)
+   672	- Every "NONE" claim for same-milestone issues has issue-body-level evidence
+   673	- Every "Verified" column entry states what was actually examined
+   674	- All impacted documentation has been updated (not just noted for later)
+   675	- Post-merge actions are explicitly listed
+   676	- All new issues created by the PR are linked
+   677	
+   678	**ALL certificates pass validation (Section 4) when:**
+   679	- Every claim has been independently verified against its cited source
+   680	- A "Verified" annotation exists for each claim
+   681	- Any corrections from validation are committed (not silently fixed)
+   682	
+   683	---
+   684	
+   685	## 6. Quality Bar
+   686	
+   687	### Reference Hierarchy
+   688	
+   689	When evaluating design decisions, compare against (in order):
+   690	
+   691	1. **Inspect AI** (`inspect_ai/` in `.venv/`) — primary reference
+   692	   - Entry point patterns: `inspect_ai/_util/registry.py`
+   693	   - Model API decoration: `inspect_ai/model/_registry.py`
+   694	   - Resolution/lookup: `inspect_ai/model/_model.py`
+   695	
+   696	2. **MTEB** — embedding benchmark standard
+   697	   - Model loading patterns
+   698	   - Evaluation pipeline structure
+   699	
+   700	3. **Python standard library** — language-level patterns
+   701	   - `importlib.metadata` for entry points
+   702	   - `typing.Protocol` for structural typing
+   703	   - `abc.ABC` for abstract base classes
+   704	
+   705	### The Standard
+   706	
+   707	> "What's the BEST we can do?" — not "What does the reference do?"
+   708	
+   709	The reference establishes a floor. We aim for the ceiling. If Inspect AI does
+   710	zero validation at decoration time, we validate method existence AND signature.
+   711	If MTEB has no per-sample drill-down, we provide it via Inspect's EvalLog.
+   712	
+   713	Never use "the reference does less" as justification for doing less ourselves.
+   714	
+   715	---
+   716	
+   717	## 7. Subprocess: Handling Review Feedback
+   718	
+   719	When a PR receives review feedback:
+   720	
+   721	1. **Read the feedback** — understand the reviewer's concern
+   722	2. **Verify against codebase** (5-point checklist):
+   723	   - Technically correct for THIS codebase?
+   724	   - Breaks existing functionality?
+   725	   - Reason for current implementation?
+   726	   - Works on all platforms/versions?
+   727	   - Does reviewer understand full context?
+   728	3. **If feedback is correct:** Fix it, reply inline with what was done
+   729	4. **If feedback is questionable:** Push back with technical evidence
+   730	5. **Never:** Performatively agree, mark conversations resolved, force-push after review
+   731	
+   732	---
+   733	
+   734	## 8. Subprocess: Handling Quality Debt
+   735	
+   736	When a finding identifies existing (pre-existing) issues:
+   737	
+   738	```
+   739	Is the issue in code we're touching?
+   740	├── YES → Fix it now. No excuses.
+   741	└── NO → Is it in adjacent code that affects our work?
+   742	    ├── YES → Fix it now.
+   743	    └── NO → Create a tracked issue (Decoupled Backlog).
+   744	              Produce Deferred Scope Certificate.
+   745	              Never say "pre-existing, not our problem."
+   746	```
+   747	
+   748	---
+   749	
+   750	## 9. Artifact Locations
+   751	
+   752	| Artifact | Location | Convention |
+   753	|----------|----------|------------|
+   754	| Design documents | `docs/plans/YYYY-MM-DD-issue-NNN-<topic>-design.md` | Committed, not gitignored |
+   755	| Implementation plans | `docs/plans/YYYY-MM-DD-issue-NNN-<topic>-plan.md` | Committed |
+   756	| Review certificates | `docs/plans/YYYY-MM-DD-issue-NNN-review-certificates.md` | Committed |
+   757	| Process definitions | `docs/process/` | This directory |
+   758	| Contracts | `docs/contracts/` | Interface specs |
+   759	| Guides | `docs/guides/` | Implementer/researcher docs |
+   760	| Spike results | `docs/decisions/` | Decision records from spikes |

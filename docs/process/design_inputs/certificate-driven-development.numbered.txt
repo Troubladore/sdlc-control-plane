@@ -1,0 +1,260 @@
+     1	# Certificate-Driven Development
+     2	
+     3	> "This team raises the bar in everything they do."
+     4	
+     5	This document defines the development process for grounding-measure-core.
+     6	Every claim of completion, every deferred scope, and every design decision
+     7	must be backed by a verifiable certificate. No hand-waving. No "looks good."
+     8	
+     9	**Reference:** Ugare & Chandra (2026) "Agentic Code Reasoning" — semi-formal
+    10	reasoning improves code analysis accuracy by 10+ percentage points by
+    11	requiring explicit premises, evidence traces, and formal conclusions.
+    12	
+    13	---
+    14	
+    15	## Core Principle
+    16	
+    17	**Every assertion must have verifiable evidence.**
+    18	
+    19	This applies to:
+    20	- "Tests pass" — show the output
+    21	- "This is out of scope" — show the tracking issue
+    22	- "This design decision is correct" — show the reference evidence
+    23	- "The implementation matches the spec" — trace each requirement to code
+    24	
+    25	---
+    26	
+    27	## State Machine
+    28	
+    29	```
+    30	[Pending] ──→ [Implementing] ──→ [Self-Review] ──→ [Certificate Review]
+    31	                                                         │
+    32	                                               ┌─────────┤
+    33	                                               │         │
+    34	                                          [Issues]  [Certified]
+    35	                                               │         │
+    36	                                               ▼         ▼
+    37	                                        [Implementing] [Complete]
+    38	```
+    39	
+    40	### Gate: Implementing → Self-Review
+    41	- Code committed on feature branch
+    42	- Tests written (TDD: red/green verified)
+    43	- Tests pass (fresh output)
+    44	
+    45	### Gate: Self-Review → Certificate Review
+    46	- Implementer has reviewed own work for completeness, quality, discipline
+    47	
+    48	### Gate: Certificate Review → Certified
+    49	- Task Review Certificate produced (see template below)
+    50	- All premises SATISFIED
+    51	- All quality assertions VERIFIED
+    52	- No Critical or Important issues open
+    53	
+    54	### Gate: Certificate Review → Issues
+    55	- Certificate identifies gaps
+    56	- Loops back to Implementing with specific items
+    57	
+    58	---
+    59	
+    60	## Certificate Templates
+    61	
+    62	### 1. Task Review Certificate
+    63	
+    64	Produced after implementation, covering both spec compliance and code quality
+    65	in a single pass. This is the review — not an add-on to a separate review.
+    66	
+    67	```
+    68	TASK REVIEW CERTIFICATE
+    69	
+    70	DEFINITIONS:
+    71	D1: Task is COMPLETE iff all spec requirements are satisfied
+    72	    AND code quality meets project standards.
+    73	
+    74	PREMISES (from task spec):
+    75	P1: [requirement] → Evidence: [file:line] → [SATISFIED/MISSING]
+    76	P2: [requirement] → Evidence: [file:line] → [SATISFIED/MISSING]
+    77	...
+    78	
+    79	CODE QUALITY ASSERTIONS:
+    80	Q1: Tests follow TDD (red/green verified) → Evidence: [commit SHAs showing red then green]
+    81	Q2: No regressions → Evidence: [test command output]
+    82	Q3: Follows existing patterns → Evidence: [file:line comparison with codebase]
+    83	Q4: No overbuilding (YAGNI) → Evidence: [files changed vs spec scope]
+    84	
+    85	VERIFICATION COMMANDS RUN:
+    86	V1: [test command] → [output summary, exit code]
+    87	V2: [lint command] → [output summary, exit code]
+    88	V3: [type check command] → [output summary, exit code]
+    89	
+    90	FORMAL CONCLUSION:
+    91	By D1, since P1..PN are [SATISFIED] and Q1..QN are [VERIFIED],
+    92	task is [COMPLETE/NOT COMPLETE].
+    93	
+    94	ISSUES (if any):
+    95	I1: [description] at [file:line] — Severity: [Critical/Important/Minor]
+    96	```
+    97	
+    98	### 2. Design Decision Certificate
+    99	
+   100	Produced when making an architectural or design choice. The standard is
+   101	not "does it work?" but "is this world-class?"
+   102	
+   103	```
+   104	DESIGN DECISION CERTIFICATE
+   105	
+   106	DEFINITION:
+   107	D1: A design decision is JUSTIFIED iff it matches or exceeds the
+   108	    pattern used by the reference implementation (Inspect AI) OR has
+   109	    documented evidence for why divergence is superior.
+   110	
+   111	PREMISES:
+   112	P1: Our pattern is [description with file:line evidence]
+   113	P2: Reference pattern is [description with file:line evidence from reference repo]
+   114	P3: [If diverging] Reason for divergence: [evidence why ours is better]
+   115	
+   116	EVALUATION:
+   117	- Match: [MATCHES / EXCEEDS / DIVERGES]
+   118	- If DIVERGES without justification: MUST REVISE
+   119	
+   120	CONCLUSION:
+   121	By D1, this decision is [JUSTIFIED / NEEDS REVISION].
+   122	```
+   123	
+   124	**Reference repos (in priority order):**
+   125	1. [Inspect AI](https://github.com/UKGovernmentBEIS/inspect_ai) — our primary sibling framework
+   126	2. [MTEB](https://github.com/embeddings-benchmark/mteb) — embedding evaluation standard
+   127	3. Python standard library patterns
+   128	
+   129	**The bar:** We match or exceed. Never slouch to a lower standard because
+   130	"others do it that way." If the reference does zero validation, we do more.
+   131	
+   132	### 3. Deferred Scope Certificate
+   133	
+   134	Produced when work is intentionally deferred. "Out of scope" is not an
+   135	excuse — it's a claim that requires proof.
+   136	
+   137	```
+   138	DEFERRED SCOPE CERTIFICATE
+   139	
+   140	DEFINITION:
+   141	D1: Work is validly DEFERRED iff it is tracked by an open issue
+   142	    with clear acceptance criteria, positioned correctly in the
+   143	    roadmap dependency graph, and does not leave the current
+   144	    deliverable in an inconsistent state.
+   145	
+   146	PREMISES:
+   147	P1: The deferred work is [description]
+   148	P2: Tracked by issue [#N] with title [title]
+   149	P3: Issue acceptance criteria: [list]
+   150	P4: Roadmap position: [milestone, blocked-by, blocks]
+   151	P5: Current deliverable consistency: [evidence]
+   152	
+   153	EVALUATION:
+   154	- Tracked: [YES with issue link / NO — must create]
+   155	- Acceptance criteria clear: [YES/NO]
+   156	- Roadmap position valid: [YES/NO]
+   157	- Current state consistent: [YES/NO with evidence]
+   158	
+   159	CONCLUSION:
+   160	By D1, this deferral is [VALID / INVALID — must address now or create issue].
+   161	```
+   162	
+   163	### 4. Impact Alignment Certificate
+   164	
+   165	Produced before a PR is submitted. Ensures the change does not silently
+   166	invalidate, contradict, or drift from existing issues, roadmap, or
+   167	documentation. Every open issue and core document is inspected for impact.
+   168	
+   169	```
+   170	IMPACT ALIGNMENT CERTIFICATE
+   171	
+   172	DEFINITION:
+   173	D1: A PR is ALIGNED iff it does not introduce inconsistencies with
+   174	    any open issue, the roadmap, or core documentation — and any
+   175	    impacts are acknowledged with updates or tracked follow-ups.
+   176	
+   177	ROADMAP IMPACT:
+   178	R1: v3 project plan (docs/inspect_refactor/grounding_lab_project_plan_v3.md)
+   179	    Impact: [NONE / description of impact]
+   180	    Action: [N/A / updated plan / created follow-up issue #N]
+   181	
+   182	OPEN ISSUE SCAN:
+   183	For each open issue that could be affected by this PR:
+   184	I1: #[N] [title] → Impact: [NONE / description] → Action: [N/A / updated / created follow-up]
+   185	I2: #[N] [title] → Impact: [NONE / description] → Action: [N/A / updated / created follow-up]
+   186	...
+   187	
+   188	DOCUMENTATION IMPACT:
+   189	D1: CLAUDE.md → [NONE / UPDATED with description]
+   190	D2: CONTRIBUTING.md → [NONE / UPDATED with description]
+   191	D3: docs/contracts/embedder_v1.md → [NONE / UPDATED with description]
+   192	D4: docs/guides/adding-an-embedder.md → [NONE / UPDATED with description]
+   193	D5: [other affected docs] → [NONE / UPDATED]
+   194	
+   195	DEPENDENCY GRAPH:
+   196	- Issues now unblocked by this PR: [list]
+   197	- Issues that should update their blocked-by: [list]
+   198	- New issues created by this PR: [list with #numbers]
+   199	
+   200	FORMAL CONCLUSION:
+   201	By D1, this PR is [ALIGNED / NOT ALIGNED — must address impacts].
+   202	```
+   203	
+   204	---
+   205	
+   206	## When to Produce Certificates
+   207	
+   208	| Event | Certificate Required |
+   209	|-------|---------------------|
+   210	| Task implementation complete | Task Review Certificate |
+   211	| Architecture/design choice made | Design Decision Certificate |
+   212	| Work deferred as "out of scope" | Deferred Scope Certificate |
+   213	| PR ready for review | Impact Alignment Certificate + all applicable certs |
+   214	
+   215	---
+   216	
+   217	## Anti-Patterns
+   218	
+   219	| Pattern | Problem | Fix |
+   220	|---------|---------|-----|
+   221	| "Looks good" | No evidence | Produce certificate with file:line references |
+   222	| "Out of scope" | No tracking | Create issue, produce Deferred Scope Certificate |
+   223	| "Inspect does X" | Matching a lower bar | Ask: "What's the BEST we can do?" then do that |
+   224	| "Pre-existing issue" | Ignoring quality debt | Fix it or create a tracked issue |
+   225	| "Tests pass" (without output) | Unverified claim | Run command, show output, then claim |
+   226	| Review as separate layer | Redundant work | Certificate IS the review — one integrated pass |
+   227	
+   228	---
+   229	
+   230	## Process for Camunda State Engine
+   231	
+   232	Each state transition requires specific artifacts:
+   233	
+   234	```yaml
+   235	states:
+   236	  pending:
+   237	    transitions:
+   238	      - to: implementing
+   239	        trigger: assignment
+   240	
+   241	  implementing:
+   242	    transitions:
+   243	      - to: self_review
+   244	        requires:
+   245	          - code_committed: true
+   246	          - tests_written_tdd: true
+   247	          - tests_pass: fresh_output
+   248	
+   249	  self_review:
+   250	    transitions:
+   251	      - to: certificate_review
+   252	        requires:
+   253	          - self_review_complete: true
+   254	
+   255	  certificate_review:
+   256	    transitions:
+   257	      - to: certified
+   258	        requires:
+   259	          - task_review_certificate: all_premises_satisfied
+   260	          - no_critical_issues: true

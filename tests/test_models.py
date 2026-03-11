@@ -6,20 +6,25 @@ import pytest
 from pydantic import ValidationError
 
 from sdlc_control_plane.verification.models import (
+    Actor,
     ActorRole,
+    ArtifactRef,
     ArtifactType,
     AuthorKind,
     CertificateType,
     CommandVerificationStatus,
+    EvidenceRef,
     EvidenceType,
     ExecutorType,
     GateStatus,
     Id,
     IssueFindingStatus,
+    Locator,
     NonEmptyString,
     Severity,
     ValidationStatus,
     VerificationMethod,
+    VerificationRecord,
     VerifiedStatus,
     WorkflowState,
 )
@@ -140,3 +145,58 @@ class TestEnums:
 
     def test_gate_status_values(self) -> None:
         assert set(GateStatus) == {"passed", "failed", "waived", "not_evaluated"}
+
+
+class TestActor:
+    def test_valid_actor(self) -> None:
+        a = Actor(actor_id="claude-1", author_kind="claude", role="reviewer_a")
+        assert a.actor_id == "claude-1"
+
+    def test_actor_rejects_extra_field(self) -> None:
+        with pytest.raises(ValidationError):
+            Actor(actor_id="a", author_kind="claude", role="reviewer_a", bogus="x")
+
+    def test_actor_missing_required(self) -> None:
+        with pytest.raises(ValidationError):
+            Actor(actor_id="a", author_kind="claude")  # type: ignore[call-arg]
+
+
+class TestLocator:
+    def test_empty_locator(self) -> None:
+        loc = Locator()
+        assert loc.path is None
+
+    def test_locator_with_fields(self) -> None:
+        loc = Locator(path="src/foo.py", start_line=1, end_line=10)
+        assert loc.start_line == 1
+
+
+class TestArtifactRef:
+    def test_valid(self) -> None:
+        ref = ArtifactRef(artifact_id="art-1", artifact_type="file")
+        assert ref.artifact_type == ArtifactType.FILE
+
+    def test_missing_required(self) -> None:
+        with pytest.raises(ValidationError):
+            ArtifactRef(artifact_id="art-1")  # type: ignore[call-arg]
+
+
+class TestEvidenceRef:
+    def test_valid(self) -> None:
+        ref = EvidenceRef(
+            evidence_id="ev-1",
+            evidence_type="file_span",
+            artifact_ref=ArtifactRef(artifact_id="art-1", artifact_type="file"),
+        )
+        assert ref.evidence_type == EvidenceType.FILE_SPAN
+
+
+class TestVerificationRecord:
+    def test_valid(self) -> None:
+        vr = VerificationRecord(
+            status="verified",
+            method="source_read",
+            verified_by=Actor(actor_id="c1", author_kind="claude", role="reviewer_a"),
+            verified_at="2026-03-11T00:00:00Z",
+        )
+        assert vr.status == VerifiedStatus.VERIFIED

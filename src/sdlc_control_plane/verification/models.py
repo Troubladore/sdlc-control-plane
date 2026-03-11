@@ -15,7 +15,7 @@ else:
         """Backport of StrEnum for Python < 3.11."""
 
 
-from pydantic import StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 # ---------------------------------------------------------------------------
 # Constrained string types
@@ -287,3 +287,66 @@ class DocumentationImpactStatus(StrEnum):
     NONE = "none"
     UPDATED = "updated"
     FOLLOW_UP_REQUIRED = "follow_up_required"
+
+
+# ---------------------------------------------------------------------------
+# Building block models
+# ---------------------------------------------------------------------------
+
+
+class Actor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: Id
+    author_kind: AuthorKind
+    role: ActorRole
+    display_name: NonEmptyString | None = None
+    model_family: NonEmptyString | None = None
+    version: NonEmptyString | None = None
+
+
+class Locator(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: NonEmptyString | None = None
+    start_line: int | None = Field(default=None, ge=1)
+    end_line: int | None = Field(default=None, ge=1)
+    issue_number: int | None = Field(default=None, ge=1)
+    url: str | None = None
+    command: NonEmptyString | None = None
+    commit_sha: Annotated[str, StringConstraints(pattern=r"^[A-Fa-f0-9]{7,40}$")] | None = None
+    diff_hunk: NonEmptyString | None = None
+    note: NonEmptyString | None = None
+
+
+class ArtifactRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: Id
+    artifact_type: ArtifactType
+    uri: str | None = None
+    content_hash: Sha256 | None = None
+    locator: Locator | None = None
+    description: NonEmptyString | None = None
+
+
+class EvidenceRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_id: Id
+    evidence_type: EvidenceType
+    artifact_ref: ArtifactRef
+    excerpt_hash: Sha256 | None = None
+    excerpt: NonEmptyString | None = None
+    candidate_inventory_id: Id | None = None
+
+
+class VerificationRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: VerifiedStatus
+    method: VerificationMethod
+    verified_by: Actor
+    verified_at: Timestamp
+    evidence_checked: list[Id] | None = None
+    notes: NonEmptyString | None = None

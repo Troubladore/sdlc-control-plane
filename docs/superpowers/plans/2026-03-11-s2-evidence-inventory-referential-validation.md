@@ -32,6 +32,208 @@ Expected: All lint, typecheck, and tests pass.
 
 ---
 
+## Chunk 0: Model Fix — Claim-Bearing Impact Assessments
+
+### Task 0: Make IssueImpactAssessment and DocumentationImpact extend ClaimBase
+
+**Files:**
+- Modify: `src/sdlc_control_plane/verification/models.py:382-467` (change inheritance)
+- Modify: `schemas/agent_workflow_schema_bundle.json` (add ClaimBase fields to both $defs)
+- Modify: `tests/test_models.py` (update test data for both types)
+- Modify: `tests/fixtures/valid_impact_alignment.json` (add claim_id, text, evidence_refs)
+
+**Why:** `ImpactAlignmentCertificate` has no `ClaimBase` fields, but `FormalConclusion.derived_from_claim_ids` requires `min_length=1`. Without this fix, every impact alignment certificate would fail referential validation — a model contradiction. See spec Section 3.
+
+- [ ] **Step 1: Write failing test — IssueImpactAssessment is a ClaimBase**
+
+Add to `tests/test_models.py`:
+
+```python
+class TestIssueImpactAssessmentClaimBase:
+    def test_is_claim_base_subclass(self) -> None:
+        from sdlc_control_plane.verification.models import ClaimBase
+        assert issubclass(IssueImpactAssessment, ClaimBase)
+
+    def test_has_claim_id(self) -> None:
+        vr = {
+            "status": "verified",
+            "method": "source_read",
+            "verified_by": {"actor_id": "c1", "author_kind": "claude", "role": "reviewer_a"},
+            "verified_at": "2026-03-11T00:00:00Z",
+        }
+        iia = IssueImpactAssessment(
+            claim_id="iia-1",
+            text="Issue #41 is not impacted by this PR",
+            evidence_refs=[
+                {
+                    "evidence_id": "ev-1",
+                    "evidence_type": "issue_body",
+                    "artifact_ref": {"artifact_id": "iss-41", "artifact_type": "issue"},
+                }
+            ],
+            issue_ref={"artifact_id": "iss-41", "artifact_type": "issue"},
+            impact_status="none",
+            action="No action needed",
+            verification=vr,
+        )
+        assert iia.claim_id == "iia-1"
+        assert len(iia.evidence_refs) == 1
+
+
+class TestDocumentationImpactClaimBase:
+    def test_is_claim_base_subclass(self) -> None:
+        from sdlc_control_plane.verification.models import ClaimBase
+        assert issubclass(DocumentationImpact, ClaimBase)
+
+    def test_has_claim_id(self) -> None:
+        di = DocumentationImpact(
+            claim_id="di-1",
+            text="CLAUDE.md has no impact",
+            evidence_refs=[
+                {
+                    "evidence_id": "ev-2",
+                    "evidence_type": "documentation_page",
+                    "artifact_ref": {"artifact_id": "doc-1", "artifact_type": "design_doc"},
+                }
+            ],
+            document_ref={"artifact_id": "doc-1", "artifact_type": "design_doc"},
+            status="none",
+        )
+        assert di.claim_id == "di-1"
+```
+
+- [ ] **Step 2: Run to verify fail**
+
+Run: `uv run pytest tests/test_models.py::TestIssueImpactAssessmentClaimBase -v`
+Expected: FAIL — `IssueImpactAssessment` does not accept `claim_id`
+
+- [ ] **Step 3: Change model inheritance**
+
+In `src/sdlc_control_plane/verification/models.py`, change:
+
+```python
+# Before:
+class IssueImpactAssessment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    issue_ref: ArtifactRef
+    impact_status: ImpactStatus
+    action: NonEmptyString
+    verification: VerificationRecord
+    impact_description: NonEmptyString | None = None
+
+# After:
+class IssueImpactAssessment(ClaimBase):
+    model_config = ConfigDict(extra="forbid")
+
+    issue_ref: ArtifactRef
+    impact_status: ImpactStatus
+    action: NonEmptyString
+    verification: VerificationRecord  # Override: required (optional on ClaimBase)
+    impact_description: NonEmptyString | None = None
+```
+
+And:
+
+```python
+# Before:
+class DocumentationImpact(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_ref: ArtifactRef
+    status: DocumentationImpactStatus
+    description: NonEmptyString | None = None
+    verification: VerificationRecord | None = None
+
+# After:
+class DocumentationImpact(ClaimBase):
+    model_config = ConfigDict(extra="forbid")
+
+    document_ref: ArtifactRef
+    status: DocumentationImpactStatus
+    description: NonEmptyString | None = None
+    verification: VerificationRecord | None = None  # Stays optional
+```
+
+- [ ] **Step 4: Run new tests**
+
+Run: `uv run pytest tests/test_models.py::TestIssueImpactAssessmentClaimBase tests/test_models.py::TestDocumentationImpactClaimBase -v`
+Expected: PASS
+
+- [ ] **Step 5: Update existing IssueImpactAssessment and DocumentationImpact tests**
+
+The existing `TestIssueImpactAssessment.test_valid` and `TestDocumentationImpact.test_valid` tests now need `claim_id`, `text`, and `evidence_refs` fields. Update them to include these required fields.
+
+- [ ] **Step 6: Update JSON Schema bundle**
+
+Add `ClaimBase` fields to `IssueImpactAssessment` and `DocumentationImpact` in `schemas/agent_workflow_schema_bundle.json`. Both need:
+- `claim_id`, `text`, `evidence_refs` added to `properties`
+- `claim_id`, `text`, `evidence_refs` added to `required`
+- Use `allOf` with `$ref: "#/$defs/ClaimBase"` if the schema already uses composition, or add the fields directly
+
+- [ ] **Step 7: Update valid_impact_alignment.json fixture**
+
+Add `claim_id`, `text`, and `evidence_refs` to each `IssueImpactAssessment` in `open_issue_scan`, and update `derived_from_claim_ids` to reference the new claim IDs:
+
+```json
+{
+  "open_issue_scan": [
+    {
+      "claim_id": "iia-1",
+      "text": "Issue #41 is not impacted by this change",
+      "evidence_refs": [
+        {
+          "evidence_id": "ev-1",
+          "evidence_type": "issue_body",
+          "artifact_ref": {"artifact_id": "issue-41", "artifact_type": "issue"}
+        }
+      ],
+      "issue_ref": {"artifact_id": "issue-41", "artifact_type": "issue"},
+      "impact_status": "none",
+      "action": "No action needed",
+      "verification": {
+        "status": "verified",
+        "method": "source_read",
+        "verified_by": {"actor_id": "c1", "author_kind": "claude", "role": "reviewer_a"},
+        "verified_at": "2026-03-11T00:00:00Z"
+      }
+    }
+  ],
+  "formal_conclusion": {
+    "status": "aligned",
+    "derived_from_claim_ids": ["iia-1"]
+  }
+}
+```
+
+- [ ] **Step 8: Run drift tests**
+
+Run: `uv run pytest tests/test_schema_drift.py -v`
+Expected: All PASS
+
+- [ ] **Step 9: Run full check**
+
+Run: `make check`
+Expected: All PASS
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add src/sdlc_control_plane/verification/models.py schemas/agent_workflow_schema_bundle.json tests/test_models.py tests/fixtures/valid_impact_alignment.json
+git commit -m "fix(s2): make IssueImpactAssessment and DocumentationImpact extend ClaimBase
+
+Resolves model contradiction: ImpactAlignmentCertificate had no ClaimBase
+fields but FormalConclusion.derived_from_claim_ids requires min_length=1.
+
+Both types now inherit claim_id, text, evidence_refs from ClaimBase.
+IssueImpactAssessment overrides verification as required.
+DocumentationImpact keeps verification optional.
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+---
+
 ## Chunk 1: Foundation — Diagnostic Model + Schema/Model Updates
 
 ### Task 1: Diagnostic Model
@@ -538,19 +740,13 @@ class TestValidCertificatePassesRefChecks:
         errors = [d for d in diagnostics if d.severity == "error"]
         assert errors == []
 
-    def test_valid_impact_alignment_known_design_gap(self) -> None:
-        """ImpactAlignmentCertificate has no ClaimBase fields, but
-        FormalConclusion.derived_from_claim_ids requires min_length=1.
-        The fixture references 'issue-41' which is an ArtifactRef ID,
-        not a claim ID. This is a pre-existing design tension — the
-        referential validator correctly flags it as missing_claim_ref.
-        """
+    def test_valid_impact_alignment_no_errors(self) -> None:
+        """After Task 0 model fix, IssueImpactAssessment extends ClaimBase
+        so derived_from_claim_ids can reference assessment claim IDs."""
         cert = _load_cert("valid_impact_alignment.json")
         diagnostics = validate_refs(cert)
         errors = [d for d in diagnostics if d.severity == "error"]
-        # Only expected error: the derived_from_claim_ids reference
-        assert all(d.code == "missing_claim_ref" for d in errors)
-        assert len(errors) == 1
+        assert errors == []
 ```
 
 - [ ] **Step 2: Run to verify fail**

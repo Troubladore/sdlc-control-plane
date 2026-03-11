@@ -78,9 +78,63 @@ def pydantic_errors_to_diagnostics(error: ValidationError, file_path: str) -> li
 
 The CLI composes these. Tests call them directly.
 
-## 3. Canonical Evidence & Artifact Inventory
+## 3. Model Fixes: Claim-Bearing Impact Assessments
 
-### 3.1 Model Changes
+### 3.0 Problem
+
+`ImpactAlignmentCertificate` has no `ClaimBase` fields. Its domain-specific types (`IssueImpactAssessment`, `DocumentationImpact`) are plain `BaseModel` subclasses with no `claim_id` or `evidence_refs`. Yet `FormalConclusion.derived_from_claim_ids` requires `min_length=1` and the S2 referential validator makes `missing_claim_ref` an error. This means every structurally valid `ImpactAlignmentCertificate` would fail referential validation — a model contradiction.
+
+### 3.1 Fix: Extend ClaimBase
+
+Both `IssueImpactAssessment` and `DocumentationImpact` become `ClaimBase` subclasses:
+
+```python
+class IssueImpactAssessment(ClaimBase):
+    model_config = ConfigDict(extra="forbid")
+
+    # Inherited from ClaimBase: claim_id, text, evidence_refs (min_length=1),
+    #   verification (optional), notes
+    issue_ref: ArtifactRef
+    impact_status: ImpactStatus
+    action: NonEmptyString
+    verification: VerificationRecord          # Override: required (was optional on ClaimBase)
+    impact_description: NonEmptyString | None = None
+
+
+class DocumentationImpact(ClaimBase):
+    model_config = ConfigDict(extra="forbid")
+
+    # Inherited from ClaimBase: claim_id, text, evidence_refs (min_length=1),
+    #   verification (optional), notes
+    document_ref: ArtifactRef
+    status: DocumentationImpactStatus
+    description: NonEmptyString | None = None
+    verification: VerificationRecord | None = None  # Stays optional
+```
+
+**Field semantics:**
+- `text` (from `ClaimBase`) is the assertion: e.g., "Issue #41 is not impacted by this PR."
+- `action` remains as a separate field for the prescribed response: e.g., "No action needed."
+- `evidence_refs` (from `ClaimBase`) grounds the assertion with evidence.
+- `claim_id` participates in the document-wide claim namespace.
+- `derived_from_claim_ids` on `ImpactAlignmentCertificate` now references these assessment claims.
+
+**Why extend, not wrap:** Wrapping `ClaimBase` adds indirection (nested claim paths, noisier diagnostics, more verbose authoring) for no benefit. The assessment rows ARE claims — "this issue has no impact" is an assertion that should be evidence-backed.
+
+**Verification override:** `IssueImpactAssessment` overrides `verification` to be required because impact assessments always require verification. `DocumentationImpact` keeps it optional. `ClaimBase.verification` is NOT changed globally — that would be an S5-scope policy change.
+
+### 3.2 Cascade
+
+This change requires updates to:
+- `src/sdlc_control_plane/verification/models.py` — change inheritance
+- `schemas/agent_workflow_schema_bundle.json` — add `ClaimBase` fields to both schema definitions
+- `tests/test_models.py` — update `IssueImpactAssessment` and `DocumentationImpact` test data
+- `tests/fixtures/valid_impact_alignment.json` — add `claim_id`, `text`, `evidence_refs` to assessments
+- `tests/test_schema_drift.py` — no changes needed (drift test already covers both types)
+
+## 4. Canonical Evidence & Artifact Inventory
+
+### 4.1 Envelope Changes
 
 Two new optional fields on `CertificateEnvelope`:
 
@@ -91,7 +145,7 @@ class CertificateEnvelope(BaseModel):
     evidence_inventory: list[EvidenceRef] | None = None
 ```
 
-### 3.2 Semantics
+### 4.2 Semantics
 
 **Model level:** The fields are optional (`None` default) for backward compatibility. Pydantic does not reject certificates missing inventories.
 
@@ -99,7 +153,7 @@ class CertificateEnvelope(BaseModel):
 
 This is a deliberate split: the Pydantic model is permissive (accepts legacy input), while referential validation adds convention-level rigor. The "required" expectation is enforced by documentation and by certificate-producing tooling (S6+), not by structural schema validation.
 
-### 3.3 Inline References
+### 4.3 Inline References
 
 S2 does not yet introduce lightweight `ArtifactUse` / `EvidenceUse` reference types. Inline occurrences remain full `ArtifactRef` / `EvidenceRef` objects. When inventories are present:
 
@@ -109,7 +163,7 @@ S2 does not yet introduce lightweight `ArtifactUse` / `EvidenceUse` reference ty
 
 Lightweight reference types (ID-only inline references) are a future refinement tracked separately.
 
-### 3.4 Why Inventories on the Envelope
+### 4.4 Why Inventories on the Envelope
 
 **Decision:** Canonical inventories live on `CertificateEnvelope`, not in a companion document.
 
@@ -119,9 +173,9 @@ Lightweight reference types (ID-only inline references) are a future refinement 
 - The repo's artifact-first, replayable design requires that a certificate be self-contained for validation purposes.
 - Companion documents only make sense when inventories are shared across certificates in a workflow, which is not the current S2 scope.
 
-## 4. Referential Check Inventory
+## 5. Referential Check Inventory
 
-### 4.1 Pure Checks (always run) — `referential.py`
+### 5.1 Pure Checks (always run) — `referential.py`
 
 | Code | Severity | Description |
 |------|----------|-------------|
@@ -147,7 +201,7 @@ Lightweight reference types (ID-only inline references) are a future refinement 
 | `artifact_definition_mismatch` | error | Inline `ArtifactRef` has different `artifact_type`, `content_hash`, `uri`, or `locator` than the canonical inventory entry. `description` is excluded from comparison — it may vary in verbosity across inline occurrences without constituting a semantic mismatch. |
 | `evidence_definition_mismatch` | error | Inline `EvidenceRef` has different `evidence_type`, `excerpt_hash`, `excerpt`, or `artifact_ref` than the canonical inventory entry. The full `artifact_ref` is compared because an evidence item pointing to a different artifact than the canonical entry is a semantic error. |
 
-### 4.2 Claim Namespace Semantics
+### 5.2 Claim Namespace Semantics
 
 **Decision:** All `ClaimBase` nodes share one document-wide namespace.
 
@@ -157,7 +211,7 @@ Lightweight reference types (ID-only inline references) are a future refinement 
 - A global namespace is simpler, works naturally with a generic tree walk, and avoids surprising collisions where two claim-bearing nodes accidentally share an ID.
 - For machine-generated certificates, global uniqueness is a reasonable constraint.
 
-### 4.3 Duplicate ID Semantics
+### 5.3 Duplicate ID Semantics
 
 **Decision:** Duplicate IDs mean duplicate *definitions*, not duplicate citations.
 
@@ -174,7 +228,7 @@ The `duplicate_*_id` checks still apply **within the inventory itself** — two 
 
 Similarly, `missing_evidence_in_verification` resolves `VerificationRecord.evidence_checked` IDs against the **canonical inventory when present**, falling back to document-wide `EvidenceRef` collection when inventories are absent.
 
-### 4.4 Filesystem Checks (only with `--project-root`) — `locator_fs.py`
+### 5.4 Filesystem Checks (only with `--project-root`) — `locator_fs.py`
 
 | Code | Severity | Description |
 |------|----------|-------------|
@@ -182,20 +236,20 @@ Similarly, `missing_evidence_in_verification` resolves `VerificationRecord.evide
 | `line_range_exceeds_file` | warning | `end_line` exceeds actual file line count. |
 | `path_not_regular_file` | error | Resolved path exists but is a directory, when `start_line` or `end_line` are set. A directory with line-addressed locator fields is an invalid locator, not stale state. |
 
-### 4.5 Structure Checks (Pydantic translation) — `diagnostics.py`
+### 5.5 Structure Checks (Pydantic translation) — `diagnostics.py`
 
 | Code | Severity | Description |
 |------|----------|-------------|
 | `pydantic_validation_error` | error | Translated from `ValidationError`. One diagnostic per Pydantic error, with JSON path. |
 
-### 4.6 Total: 20 Check Codes
+### 5.6 Total: 20 Check Codes
 
 - 10 always-run referential
 - 6 inventory-specific referential
 - 3 filesystem
 - 1 structural translation
 
-## 5. Generic Tree Walk
+## 6. Generic Tree Walk
 
 The referential validator walks the full model tree **recursively** rather than per-certificate-type:
 
@@ -208,7 +262,7 @@ The referential validator walks the full model tree **recursively** rather than 
 
 This ensures new certificate types get baseline referential coverage automatically. The generic walk collects all `ClaimBase` nodes regardless of which certificate type they appear in — per the document-wide claim namespace decision (Section 4.2), every `ClaimBase` node participates equally. No per-type special-casing is needed for the core referential checks.
 
-### 5.1 Non-obvious Collection Sources
+### 6.1 Non-obvious Collection Sources
 
 The tree walk must collect `EvidenceRef` and `ArtifactRef` from all model types that contain them, not just `ClaimBase` nodes. Key sources beyond claims:
 
@@ -216,8 +270,8 @@ The tree walk must collect `EvidenceRef` and `ArtifactRef` from all model types 
 |-------|-------|------|
 | `IssueFinding` | `evidence_refs`, `verification` | `list[EvidenceRef] \| None`, `VerificationRecord \| None` |
 | `CommandVerification` | `evidence_ref` | `EvidenceRef \| None` (singular) |
-| `IssueImpactAssessment` | `issue_ref`, `verification` | `ArtifactRef`, `VerificationRecord` |
-| `DocumentationImpact` | `document_ref`, `verification` | `ArtifactRef`, `VerificationRecord \| None` |
+| `IssueImpactAssessment` | `issue_ref`, `evidence_refs`, `verification` | `ArtifactRef`, `list[EvidenceRef]` (from ClaimBase), `VerificationRecord` |
+| `DocumentationImpact` | `document_ref`, `evidence_refs`, `verification` | `ArtifactRef`, `list[EvidenceRef]` (from ClaimBase), `VerificationRecord \| None` |
 | `GateEvaluation` | `verifier_artifacts` | `list[ArtifactRef] \| None` (artifacts, not evidence) |
 | `CertificateEnvelope` | `issue_ref`, `pr_ref`, `source_artifacts` | `ArtifactRef` / `list[ArtifactRef]` |
 | `RoadmapPosition` | `blocked_by`, `blocks` | `list[ArtifactRef]` |
@@ -225,9 +279,11 @@ The tree walk must collect `EvidenceRef` and `ArtifactRef` from all model types 
 
 `IssueFinding` has `issue_id` (not `claim_id`) and is **not** a `ClaimBase` subclass — its IDs are not part of the claim namespace, but its evidence refs are collected for duplicate/inventory checks.
 
-## 6. File Layout
+Note: `IssueImpactAssessment` and `DocumentationImpact` are now `ClaimBase` subclasses (Section 3), so their `claim_id` values participate in the claim namespace and their `evidence_refs` are collected via the standard `ClaimBase` walk.
 
-### 6.1 Source Code
+## 7. File Layout
+
+### 7.1 Source Code
 
 ```
 src/sdlc_control_plane/verification/
@@ -241,7 +297,7 @@ src/sdlc_control_plane/cli/
     __init__.py            # (modify) extend validate with --project-root, compose layers, render diagnostics
 ```
 
-### 6.2 Tests
+### 7.2 Tests
 
 ```
 tests/
@@ -253,16 +309,16 @@ tests/
         broken_refs_*.json # (new) Certificates with referential errors
 ```
 
-### 6.3 Key Design Decisions
+### 7.3 Key Design Decisions
 
 - `referential.py` and `locator_fs.py` are separate modules — each has a clear single responsibility and can be tested/imported independently.
 - `diagnostics.py` owns the `Diagnostic` model and the Pydantic error translation utility. It is a shared contract, not an orchestration layer.
 - `locator_fs.py` (not `filesystem.py`) — the module specifically resolves `Locator` fields against the filesystem. When URL or git-based locator resolution is added later, the naming pattern is clear: `locator_url.py`, `locator_git.py`.
 - No new dependencies — everything uses stdlib + Pydantic + Rich (already in deps).
 
-## 7. Documentation
+## 8. Documentation
 
-### 7.1 Documentation Additions
+### 8.1 Documentation Additions
 
 S2 adds structured documentation layers following the progressive discovery pattern from `grounding-measure-core`:
 
@@ -295,7 +351,7 @@ docs/verification/
     diagnostics.md               # Diagnostic model, category/code taxonomy, CLI rendering
 ```
 
-### 7.2 Documentation Norms
+### 8.2 Documentation Norms
 
 Each doc category has a normative status:
 
@@ -314,12 +370,12 @@ Each major doc includes audience and reading-order headers:
 > **Prerequisite:** Familiarity with the Pydantic model layer (verification/models.py)
 ```
 
-### 7.3 Updates to Existing Docs
+### 8.3 Updates to Existing Docs
 
 - **`README.md`**: Add documentation threading table (Architecture, Decisions, Process, Implementation entry points).
 - **`CLAUDE.md`**: Add `docs/decisions/README.md` and `docs/verification/README.md` to Reference Documents section.
 
-## 8. Out of Scope
+## 9. Out of Scope
 
 Explicitly deferred from S2:
 
@@ -336,7 +392,7 @@ Explicitly deferred from S2:
 | Evidence inventory builder | Certificate production tooling, not validation | S6+ |
 | `--format json` CLI output | Defer until real automation consumer exists; library API is machine-readable | Future |
 
-## 9. Testing Strategy
+## 10. Testing Strategy
 
 - **Red/Green TDD** — write failing tests first, then implement to pass.
 - **Unit tests** for `validate_refs()` covering each check code with positive and negative cases.
@@ -347,7 +403,7 @@ Explicitly deferred from S2:
 - **Existing fixtures** remain valid — they must continue passing with the new validation layers.
 - Run `/simplify` after each major coding chunk and before PR creation.
 
-## 10. Acceptance Criteria
+## 11. Acceptance Criteria
 
 1. `sdlc validate valid_certificate.json` passes structural + referential checks (exit 0).
 2. `sdlc validate broken_refs.json` catches and reports all broken references (exit 1).

@@ -200,6 +200,8 @@ Full design: `docs/design/2026-03-10-issue-114-sdlc-control-plane-design.md`
 
 ## Reference Documents
 
+- `docs/decisions/README.md` -- Design decision index (methodology rationale)
+- `docs/verification/README.md` -- Verification component documentation (normative)
 - `docs/process/certificate-driven-development.md` -- Certificate templates and state machine
 - `docs/process/development-lifecycle-bpmn.md` -- Full BPMN lifecycle specification
 - `docs/process/agent_validation_architecture.md` -- 9-stage validation pipeline and KPIs

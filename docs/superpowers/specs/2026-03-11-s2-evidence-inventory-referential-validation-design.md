@@ -203,10 +203,10 @@ The tree walk must collect `EvidenceRef` and `ArtifactRef` from all model types 
 
 | Model | Field | Type |
 |-------|-------|------|
-| `IssueFinding` | `evidence_refs` | `list[EvidenceRef] \| None` |
+| `IssueFinding` | `evidence_refs`, `verification` | `list[EvidenceRef] \| None`, `VerificationRecord \| None` |
 | `CommandVerification` | `evidence_ref` | `EvidenceRef \| None` (singular) |
-| `IssueImpactAssessment` | `verification` | `VerificationRecord` (contains `evidence_checked`) |
-| `DocumentationImpact` | `verification` | `VerificationRecord \| None` |
+| `IssueImpactAssessment` | `issue_ref`, `verification` | `ArtifactRef`, `VerificationRecord` |
+| `DocumentationImpact` | `document_ref`, `verification` | `ArtifactRef`, `VerificationRecord \| None` |
 | `GateEvaluation` | `verifier_artifacts` | `list[ArtifactRef] \| None` (artifacts, not evidence) |
 | `CertificateEnvelope` | `issue_ref`, `pr_ref`, `source_artifacts` | `ArtifactRef` / `list[ArtifactRef]` |
 | `RoadmapPosition` | `blocked_by`, `blocks` | `list[ArtifactRef]` |

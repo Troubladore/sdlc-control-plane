@@ -731,6 +731,49 @@ class TestCertificateEnvelope:
         with pytest.raises(ValidationError):
             CertificateEnvelope(**_make_envelope_data(verified_claim_count=-1))
 
+    def test_inventory_fields_optional(self) -> None:
+        ce = CertificateEnvelope(**_make_envelope_data())
+        assert ce.artifact_inventory is None
+        assert ce.evidence_inventory is None
+
+    def test_with_artifact_inventory(self) -> None:
+        ce = CertificateEnvelope(
+            **_make_envelope_data(
+                artifact_inventory=[
+                    {"artifact_id": "art-1", "artifact_type": "file"},
+                ]
+            )
+        )
+        assert len(ce.artifact_inventory) == 1  # type: ignore[arg-type]
+        assert ce.artifact_inventory[0].artifact_id == "art-1"  # type: ignore[index]
+
+    def test_with_evidence_inventory(self) -> None:
+        ce = CertificateEnvelope(
+            **_make_envelope_data(
+                evidence_inventory=[
+                    {
+                        "evidence_id": "ev-1",
+                        "evidence_type": "file_span",
+                        "artifact_ref": {
+                            "artifact_id": "art-1",
+                            "artifact_type": "file",
+                        },
+                    },
+                ]
+            )
+        )
+        assert len(ce.evidence_inventory) == 1  # type: ignore[arg-type]
+
+    def test_empty_inventories_allowed(self) -> None:
+        ce = CertificateEnvelope(
+            **_make_envelope_data(
+                artifact_inventory=[],
+                evidence_inventory=[],
+            )
+        )
+        assert ce.artifact_inventory == []
+        assert ce.evidence_inventory == []
+
 
 # ---------------------------------------------------------------------------
 # Typed conclusions

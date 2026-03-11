@@ -500,6 +500,8 @@ class CertificateEnvelope(BaseModel):
     validation_notes: NonEmptyString | None = None
     verified_claim_count: int | None = Field(default=None, ge=0)
     unverified_claim_count: int | None = Field(default=None, ge=0)
+    artifact_inventory: list[ArtifactRef] | None = None
+    evidence_inventory: list[EvidenceRef] | None = None
 
 
 # ---------------------------------------------------------------------------

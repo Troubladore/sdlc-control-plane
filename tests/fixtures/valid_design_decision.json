@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "certificate_id": "cert-dd-001",
+  "certificate_type": "design_decision",
+  "workflow_run_id": "run-001",
+  "issue_ref": {"artifact_id": "issue-10", "artifact_type": "issue"},
+  "produced_by": {"actor_id": "claude-1", "author_kind": "claude", "role": "reviewer_a"},
+  "produced_at": "2026-03-11T00:00:00Z",
+  "source_artifacts": [{"artifact_id": "src-1", "artifact_type": "design_doc"}],
+  "validation_status": "validated",
+  "definition": "Design decision is JUSTIFIED iff it matches or exceeds reference patterns.",
+  "decision_topic": "Schema validation approach",
+  "comparison": {
+    "our_pattern": {
+      "claim_id": "op1",
+      "text": "We use Pydantic models",
+      "evidence_refs": [{"evidence_id": "ev-1", "evidence_type": "reference_code", "artifact_ref": {"artifact_id": "a1", "artifact_type": "file"}}]
+    },
+    "reference_pattern": {
+      "claim_id": "rp1",
+      "text": "inspect_ai uses Pydantic for structured output",
+      "evidence_refs": [{"evidence_id": "ev-2", "evidence_type": "reference_code", "artifact_ref": {"artifact_id": "a2", "artifact_type": "reference_repo"}}]
+    },
+    "match_status": "matches"
+  },
+  "formal_conclusion": {
+    "status": "justified",
+    "derived_from_claim_ids": ["op1", "rp1"]
+  }
+}

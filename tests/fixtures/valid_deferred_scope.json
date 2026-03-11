@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "certificate_id": "cert-ds-001",
+  "certificate_type": "deferred_scope",
+  "workflow_run_id": "run-001",
+  "issue_ref": {"artifact_id": "issue-20", "artifact_type": "issue"},
+  "produced_by": {"actor_id": "claude-1", "author_kind": "claude", "role": "reviewer_a"},
+  "produced_at": "2026-03-11T00:00:00Z",
+  "source_artifacts": [{"artifact_id": "src-1", "artifact_type": "plan_doc"}],
+  "validation_status": "validated",
+  "definition": "Deferral is VALID iff tracked with clear criteria and consistent state.",
+  "deferred_work": "Referential validation of evidence refs",
+  "tracking_issue": {"artifact_id": "issue-21", "artifact_type": "issue"},
+  "acceptance_criteria": ["All evidence refs resolve to real artifacts"],
+  "roadmap_position": {
+    "milestone": "Session 2",
+    "blocked_by": [],
+    "blocks": [{"artifact_id": "issue-30", "artifact_type": "issue"}]
+  },
+  "current_deliverable_consistency": {
+    "claim_id": "cc1",
+    "text": "Current session works without referential validation",
+    "evidence_refs": [{"evidence_id": "ev-1", "evidence_type": "test_result", "artifact_ref": {"artifact_id": "a1", "artifact_type": "command_output"}}]
+  },
+  "evaluation": {
+    "tracked": true,
+    "acceptance_criteria_clear": true,
+    "roadmap_position_valid": true,
+    "current_state_consistent": true
+  },
+  "formal_conclusion": {
+    "status": "valid",
+    "derived_from_claim_ids": ["cc1"]
+  }
+}

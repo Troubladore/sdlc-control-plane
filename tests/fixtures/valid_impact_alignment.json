@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "certificate_id": "cert-ia-001",
+  "certificate_type": "impact_alignment",
+  "workflow_run_id": "run-001",
+  "issue_ref": {"artifact_id": "issue-40", "artifact_type": "issue"},
+  "produced_by": {"actor_id": "claude-1", "author_kind": "claude", "role": "reviewer_a"},
+  "produced_at": "2026-03-11T00:00:00Z",
+  "source_artifacts": [{"artifact_id": "src-1", "artifact_type": "pull_request"}],
+  "validation_status": "validated",
+  "definition": "Change is ALIGNED iff no silent drift from plans.",
+  "roadmap_impacts": [],
+  "open_issue_scan": [
+    {
+      "issue_ref": {"artifact_id": "issue-41", "artifact_type": "issue"},
+      "impact_status": "none",
+      "action": "No action needed",
+      "verification": {
+        "status": "verified",
+        "method": "source_read",
+        "verified_by": {"actor_id": "c1", "author_kind": "claude", "role": "reviewer_a"},
+        "verified_at": "2026-03-11T00:00:00Z"
+      }
+    }
+  ],
+  "documentation_impacts": [],
+  "dependency_graph": {
+    "unblocked_issues": [],
+    "blocked_by_updates": [],
+    "new_issues": []
+  },
+  "formal_conclusion": {
+    "status": "aligned",
+    "derived_from_claim_ids": ["issue-41"]
+  }
+}

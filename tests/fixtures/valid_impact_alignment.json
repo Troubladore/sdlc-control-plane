@@ -12,6 +12,15 @@
   "roadmap_impacts": [],
   "open_issue_scan": [
     {
+      "claim_id": "iia-41",
+      "text": "Issue 41 has no impact on current change",
+      "evidence_refs": [
+        {
+          "evidence_id": "ev-iia-41",
+          "evidence_type": "issue_body",
+          "artifact_ref": {"artifact_id": "issue-41", "artifact_type": "issue"}
+        }
+      ],
       "issue_ref": {"artifact_id": "issue-41", "artifact_type": "issue"},
       "impact_status": "none",
       "action": "No action needed",
@@ -31,6 +40,6 @@
   },
   "formal_conclusion": {
     "status": "aligned",
-    "derived_from_claim_ids": ["issue-41"]
+    "derived_from_claim_ids": ["iia-41"]
   }
 }

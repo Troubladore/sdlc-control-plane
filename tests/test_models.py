@@ -17,6 +17,7 @@ from sdlc_control_plane.verification.models import (
     AuthorKind,
     CertificateEnvelope,
     CertificateType,
+    ClaimBase,
     CommandVerification,
     CommandVerificationStatus,
     DeferredEvaluation,
@@ -430,6 +431,15 @@ class TestDeferredEvaluation:
 class TestIssueImpactAssessment:
     def test_valid(self) -> None:
         iia = IssueImpactAssessment(
+            claim_id="iia-1",
+            text="Issue impact assessment for iss-1",
+            evidence_refs=[
+                {
+                    "evidence_id": "ev-iia-1",
+                    "evidence_type": "issue_body",
+                    "artifact_ref": {"artifact_id": "iss-1", "artifact_type": "issue"},
+                }
+            ],
             issue_ref={"artifact_id": "iss-1", "artifact_type": "issue"},
             impact_status="none",
             action="No action needed",
@@ -449,6 +459,15 @@ class TestIssueImpactAssessment:
     def test_rejects_extra(self) -> None:
         with pytest.raises(ValidationError):
             IssueImpactAssessment(
+                claim_id="iia-1",
+                text="Issue impact assessment",
+                evidence_refs=[
+                    {
+                        "evidence_id": "ev-iia-1",
+                        "evidence_type": "issue_body",
+                        "artifact_ref": {"artifact_id": "iss-1", "artifact_type": "issue"},
+                    }
+                ],
                 issue_ref={"artifact_id": "iss-1", "artifact_type": "issue"},
                 impact_status="none",
                 action="x",
@@ -469,6 +488,15 @@ class TestIssueImpactAssessment:
 class TestDocumentationImpact:
     def test_valid(self) -> None:
         di = DocumentationImpact(
+            claim_id="di-1",
+            text="Documentation impact for doc-1",
+            evidence_refs=[
+                {
+                    "evidence_id": "ev-di-1",
+                    "evidence_type": "documentation_page",
+                    "artifact_ref": {"artifact_id": "doc-1", "artifact_type": "design_doc"},
+                }
+            ],
             document_ref={"artifact_id": "doc-1", "artifact_type": "design_doc"},
             status="none",
         )
@@ -477,9 +505,151 @@ class TestDocumentationImpact:
     def test_rejects_extra(self) -> None:
         with pytest.raises(ValidationError):
             DocumentationImpact(
+                claim_id="di-1",
+                text="Documentation impact",
+                evidence_refs=[
+                    {
+                        "evidence_id": "ev-di-1",
+                        "evidence_type": "documentation_page",
+                        "artifact_ref": {"artifact_id": "d1", "artifact_type": "design_doc"},
+                    }
+                ],
                 document_ref={"artifact_id": "d1", "artifact_type": "design_doc"},
                 status="none",
                 bogus="x",
+            )
+
+
+class TestIssueImpactAssessmentClaimBase:
+    def test_is_subclass_of_claim_base(self) -> None:
+        assert issubclass(IssueImpactAssessment, ClaimBase)
+
+    def test_accepts_claim_fields(self) -> None:
+        iia = IssueImpactAssessment(
+            claim_id="iia-cb-1",
+            text="Claim base fields accepted",
+            evidence_refs=[
+                {
+                    "evidence_id": "ev-cb-1",
+                    "evidence_type": "issue_body",
+                    "artifact_ref": {"artifact_id": "iss-1", "artifact_type": "issue"},
+                }
+            ],
+            issue_ref={"artifact_id": "iss-1", "artifact_type": "issue"},
+            impact_status="none",
+            action="No action",
+            verification={
+                "status": "verified",
+                "method": "source_read",
+                "verified_by": {
+                    "actor_id": "c1",
+                    "author_kind": "claude",
+                    "role": "reviewer_a",
+                },
+                "verified_at": "2026-03-11T00:00:00Z",
+            },
+            notes="Optional notes field from ClaimBase",
+        )
+        assert iia.claim_id == "iia-cb-1"
+        assert iia.text == "Claim base fields accepted"
+        assert len(iia.evidence_refs) == 1
+        assert iia.notes == "Optional notes field from ClaimBase"
+
+    def test_missing_claim_id_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            IssueImpactAssessment(
+                text="Missing claim_id",
+                evidence_refs=[
+                    {
+                        "evidence_id": "ev-1",
+                        "evidence_type": "issue_body",
+                        "artifact_ref": {"artifact_id": "iss-1", "artifact_type": "issue"},
+                    }
+                ],
+                issue_ref={"artifact_id": "iss-1", "artifact_type": "issue"},
+                impact_status="none",
+                action="No action",
+                verification={
+                    "status": "verified",
+                    "method": "source_read",
+                    "verified_by": {
+                        "actor_id": "c1",
+                        "author_kind": "claude",
+                        "role": "reviewer_a",
+                    },
+                    "verified_at": "2026-03-11T00:00:00Z",
+                },
+            )
+
+    def test_empty_evidence_refs_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            IssueImpactAssessment(
+                claim_id="iia-1",
+                text="Empty evidence",
+                evidence_refs=[],
+                issue_ref={"artifact_id": "iss-1", "artifact_type": "issue"},
+                impact_status="none",
+                action="No action",
+                verification={
+                    "status": "verified",
+                    "method": "source_read",
+                    "verified_by": {
+                        "actor_id": "c1",
+                        "author_kind": "claude",
+                        "role": "reviewer_a",
+                    },
+                    "verified_at": "2026-03-11T00:00:00Z",
+                },
+            )
+
+
+class TestDocumentationImpactClaimBase:
+    def test_is_subclass_of_claim_base(self) -> None:
+        assert issubclass(DocumentationImpact, ClaimBase)
+
+    def test_accepts_claim_fields(self) -> None:
+        di = DocumentationImpact(
+            claim_id="di-cb-1",
+            text="Claim base fields accepted",
+            evidence_refs=[
+                {
+                    "evidence_id": "ev-cb-1",
+                    "evidence_type": "documentation_page",
+                    "artifact_ref": {"artifact_id": "doc-1", "artifact_type": "design_doc"},
+                }
+            ],
+            document_ref={"artifact_id": "doc-1", "artifact_type": "design_doc"},
+            status="none",
+            notes="Optional notes field from ClaimBase",
+        )
+        assert di.claim_id == "di-cb-1"
+        assert di.text == "Claim base fields accepted"
+        assert len(di.evidence_refs) == 1
+        assert di.notes == "Optional notes field from ClaimBase"
+
+    def test_missing_claim_id_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            DocumentationImpact(
+                text="Missing claim_id",
+                evidence_refs=[
+                    {
+                        "evidence_id": "ev-1",
+                        "evidence_type": "documentation_page",
+                        "artifact_ref": {"artifact_id": "doc-1", "artifact_type": "design_doc"},
+                    }
+                ],
+                document_ref={"artifact_id": "doc-1", "artifact_type": "design_doc"},
+                status="none",
+            )
+
+    def test_empty_evidence_refs_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            DocumentationImpact(
+                claim_id="di-1",
+                text="Empty evidence",
+                evidence_refs=[],
+                document_ref={"artifact_id": "doc-1", "artifact_type": "design_doc"},
+                status="none",
             )
 
 
@@ -807,6 +977,18 @@ def _make_impact_alignment_data(**overrides: object) -> dict:
             "roadmap_impacts": [],
             "open_issue_scan": [
                 {
+                    "claim_id": "iia-1",
+                    "text": "Issue iss-1 has no impact",
+                    "evidence_refs": [
+                        {
+                            "evidence_id": "ev-iia-1",
+                            "evidence_type": "issue_body",
+                            "artifact_ref": {
+                                "artifact_id": "iss-1",
+                                "artifact_type": "issue",
+                            },
+                        }
+                    ],
                     "issue_ref": {"artifact_id": "iss-1", "artifact_type": "issue"},
                     "impact_status": "none",
                     "action": "No action",
@@ -821,7 +1003,7 @@ def _make_impact_alignment_data(**overrides: object) -> dict:
             },
             "formal_conclusion": {
                 "status": "aligned",
-                "derived_from_claim_ids": ["c1"],
+                "derived_from_claim_ids": ["iia-1"],
             },
         }
     )

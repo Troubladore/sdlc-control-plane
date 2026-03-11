@@ -133,8 +133,8 @@ Lightweight reference types (ID-only inline references) are a future refinement 
 | `empty_locator` | warning | `Locator` object exists but all fields are `None`. |
 | `note_only_locator` | warning | `Locator` has only `note` set — no resolvable target (no path, URL, command, or commit SHA). Structurally populated but semantically unresolvable. |
 | `invalid_line_range` | error | `start_line > end_line` on a `Locator`. This is an impossible span — malformed data, not stale state. |
-| `absolute_path_not_allowed` | error | `Locator.path` is an absolute path. Paths must be relative to project root. |
-| `path_escapes_project_root` | error | `Locator.path` normalizes outside project root (e.g. `../../etc/passwd`). This is a **lexical containment check against a synthetic root** — it validates the document's claim about path structure without needing `--project-root`. Algorithm: `PurePosixPath('/synthetic') / locator_path` is resolved; if the result does not start with `/synthetic/`, the check fails. The synthetic root is arbitrary; only the containment test matters. |
+| `absolute_path_not_allowed` | error | `Locator.path` is an absolute path. Locator paths must be POSIX-style relative paths. This check rejects both POSIX absolute paths (starting with `/`) and Windows drive-qualified paths (matching `^[A-Za-z]:` or starting with `\\`). |
+| `path_escapes_project_root` | error | `Locator.path` normalizes outside project root (e.g. `../../etc/passwd`). This is a **lexical containment check** — it validates the document's claim about path structure without needing `--project-root`. Algorithm: apply `posixpath.normpath()` to the path, then check whether the normalized result starts with `..` or equals `..`. Example: `posixpath.normpath("src/../../etc/passwd")` yields `"../etc/passwd"`, which starts with `..`, so the check fails. `posixpath.normpath("src/../lib/foo.py")` yields `"lib/foo.py"`, which is contained, so the check passes. |
 
 **Inventory-specific checks** (only when `artifact_inventory` / `evidence_inventory` are present):
 
@@ -161,7 +161,18 @@ Lightweight reference types (ID-only inline references) are a future refinement 
 
 **Decision:** Duplicate IDs mean duplicate *definitions*, not duplicate citations.
 
-The current embedded model has no separate "reference by ID" mechanism — each `EvidenceRef` / `ArtifactRef` occurrence is a full inline definition. The duplicate-ID checks enforce one-definition-per-ID-per-document. The canonical inventory (Section 3) provides the structural place for that single definition.
+The behavior of `duplicate_evidence_id` / `duplicate_artifact_id` depends on whether inventories are present:
+
+**When inventories are absent (legacy mode):** Every inline `EvidenceRef` / `ArtifactRef` occurrence is treated as a definition. Duplicate IDs across inline occurrences are errors. This is the S1-compatible behavior.
+
+**When inventories are present:** Inventory entries are the canonical definitions. Inline occurrences are treated as references/citations — the same ID appearing in both the inventory and inline is expected, not an error. Inline-to-inline duplicates of the same ID are also permitted (the same evidence may be cited by multiple claims). Integrity is enforced through the inventory-specific checks:
+- `missing_*_from_inventory` — every inline ID must exist in the inventory
+- `*_definition_mismatch` — inline fields must be consistent with the inventory entry
+- `unused_*_inventory_entry` — inventory entries should be referenced at least once
+
+The `duplicate_*_id` checks still apply **within the inventory itself** — two inventory entries with the same ID is always an error.
+
+Similarly, `missing_evidence_in_verification` resolves `VerificationRecord.evidence_checked` IDs against the **canonical inventory when present**, falling back to document-wide `EvidenceRef` collection when inventories are absent.
 
 ### 4.4 Filesystem Checks (only with `--project-root`) — `locator_fs.py`
 
@@ -195,7 +206,7 @@ The referential validator walks the full model tree **recursively** rather than 
 5. Collect all `VerificationRecord` instances with their JSON paths.
 6. Run checks against collected sets.
 
-This ensures new certificate types get baseline referential coverage automatically. Per-type logic is only needed where a certificate type has specific structural rules (e.g., `TaskReviewCertificate` has `premises` and `quality_assertions` that contribute to the claim namespace).
+This ensures new certificate types get baseline referential coverage automatically. The generic walk collects all `ClaimBase` nodes regardless of which certificate type they appear in — per the document-wide claim namespace decision (Section 4.2), every `ClaimBase` node participates equally. No per-type special-casing is needed for the core referential checks.
 
 ### 5.1 Non-obvious Collection Sources
 

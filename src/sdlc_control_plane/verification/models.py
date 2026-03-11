@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 if sys.version_info >= (3, 11):
     from enum import StrEnum
@@ -419,3 +419,286 @@ class GateEvaluation(BaseModel):
     status: GateStatus
     verifier_artifacts: list[ArtifactRef] | None = None
     notes: NonEmptyString | None = None
+
+
+# ---------------------------------------------------------------------------
+# Helper models for certificates
+# ---------------------------------------------------------------------------
+
+
+class DesignComparison(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    our_pattern: ClaimBase
+    reference_pattern: ClaimBase
+    match_status: DesignMatchStatus
+    divergence_reason: ClaimBase | None = None
+    reference_source: ReferenceSource | None = None
+
+
+class RoadmapPosition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    milestone: NonEmptyString
+    blocked_by: list[ArtifactRef]
+    blocks: list[ArtifactRef]
+
+
+class DeferredEvaluation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tracked: bool
+    acceptance_criteria_clear: bool
+    roadmap_position_valid: bool
+    current_state_consistent: bool
+
+
+class IssueImpactAssessment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    issue_ref: ArtifactRef
+    impact_status: ImpactStatus
+    action: NonEmptyString
+    verification: VerificationRecord
+    impact_description: NonEmptyString | None = None
+
+
+class DocumentationImpact(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_ref: ArtifactRef
+    status: DocumentationImpactStatus
+    description: NonEmptyString | None = None
+    verification: VerificationRecord | None = None
+
+
+class DependencyGraph(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    unblocked_issues: list[ArtifactRef]
+    blocked_by_updates: list[ArtifactRef]
+    new_issues: list[ArtifactRef]
+    post_merge_actions: list[NonEmptyString] | None = None
+
+
+# ---------------------------------------------------------------------------
+# Certificate Envelope (base for all certificates — NOT leaf)
+# ---------------------------------------------------------------------------
+
+
+class CertificateEnvelope(BaseModel):
+    schema_version: NonEmptyString
+    certificate_id: Id
+    certificate_type: CertificateType
+    workflow_run_id: Id
+    issue_ref: ArtifactRef
+    produced_by: Actor
+    produced_at: Timestamp
+    source_artifacts: list[ArtifactRef] = Field(min_length=1)
+    validation_status: ValidationStatus
+    pr_ref: ArtifactRef | None = None
+    validation_notes: NonEmptyString | None = None
+    verified_claim_count: int | None = Field(default=None, ge=0)
+    unverified_claim_count: int | None = Field(default=None, ge=0)
+
+
+# ---------------------------------------------------------------------------
+# Typed conclusions (constrained status subsets)
+# ---------------------------------------------------------------------------
+
+
+class TaskReviewConclusion(FormalConclusion):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["complete", "not_complete"]
+
+
+class DesignDecisionConclusion(FormalConclusion):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["justified", "needs_revision"]
+
+
+class DeferredScopeConclusion(FormalConclusion):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["valid", "invalid"]
+
+
+class ImpactAlignmentConclusion(FormalConclusion):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["aligned", "not_aligned"]
+
+
+# ---------------------------------------------------------------------------
+# Four certificate types
+# ---------------------------------------------------------------------------
+
+
+class TaskReviewCertificate(CertificateEnvelope):
+    model_config = ConfigDict(extra="forbid")
+
+    certificate_type: Literal["task_review"]
+    definition: NonEmptyString
+    premises: list[PremiseClaim] = Field(min_length=1)
+    quality_assertions: list[QualityAssertion] = Field(min_length=1)
+    verification_commands: list[CommandVerification] = Field(min_length=1)
+    formal_conclusion: TaskReviewConclusion
+    issues: list[IssueFinding]
+
+
+class DesignDecisionCertificate(CertificateEnvelope):
+    model_config = ConfigDict(extra="forbid")
+
+    certificate_type: Literal["design_decision"]
+    definition: NonEmptyString
+    decision_topic: NonEmptyString
+    comparison: DesignComparison
+    formal_conclusion: DesignDecisionConclusion
+
+
+class DeferredScopeCertificate(CertificateEnvelope):
+    model_config = ConfigDict(extra="forbid")
+
+    certificate_type: Literal["deferred_scope"]
+    definition: NonEmptyString
+    deferred_work: NonEmptyString
+    tracking_issue: ArtifactRef
+    acceptance_criteria: list[NonEmptyString] = Field(min_length=1)
+    roadmap_position: RoadmapPosition
+    current_deliverable_consistency: ClaimBase
+    evaluation: DeferredEvaluation
+    formal_conclusion: DeferredScopeConclusion
+
+
+class ImpactAlignmentCertificate(CertificateEnvelope):
+    model_config = ConfigDict(extra="forbid")
+
+    certificate_type: Literal["impact_alignment"]
+    definition: NonEmptyString
+    roadmap_impacts: list[IssueImpactAssessment]
+    open_issue_scan: list[IssueImpactAssessment] = Field(min_length=1)
+    documentation_impacts: list[DocumentationImpact]
+    dependency_graph: DependencyGraph
+    formal_conclusion: ImpactAlignmentConclusion
+
+
+# ---------------------------------------------------------------------------
+# Remaining top-level models
+# ---------------------------------------------------------------------------
+
+
+class DisputeObject(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dispute_id: Id
+    target_certificate_id: Id
+    target_claim_id: Id
+    filed_by: Actor
+    dispute_type: DisputeType
+    status: DisputeStatus
+    rationale: NonEmptyString
+    source_refs: list[EvidenceRef] = Field(min_length=1)
+    against_actor: Actor | None = None
+    validator: Actor | None = None
+    arbiter: Actor | None = None
+    proposed_fix: NonEmptyString | None = None
+    arbiter_ruling: NonEmptyString | None = None
+    penalty_points: int | None = None
+
+
+class TransitionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: Id
+    workflow_run_id: Id
+    from_state: WorkflowState
+    to_state: WorkflowState
+    requested_by: Actor
+    required_artifacts: list[ArtifactRef] = Field(min_length=1)
+    gate_evaluations: list[GateEvaluation] = Field(min_length=1)
+    status: TransitionRequestStatus
+    requested_at: Timestamp | None = None
+    decided_by: Actor | None = None
+    decision_notes: NonEmptyString | None = None
+
+
+class RemediationLogEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sequence: int = Field(ge=1)
+    timestamp: Timestamp
+    author: AuthorKind
+    action: RemediationAction
+    deficiency_id: Id
+    content: NonEmptyString
+    prev_hash: Sha256
+    signature: NonEmptyString
+    content_hash: Sha256 | None = None
+    authority_verified: bool | None = None
+    signature_verified: bool | None = None
+    hash_chain_verified: bool | None = None
+
+
+class RemediationLog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    log_id: Id
+    certificate_id: Id
+    certificate_status: RemediationLogStatus
+    entries: list[RemediationLogEntry]
+    open_deficiency_count: int | None = Field(default=None, ge=0)
+
+
+class WorkflowEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: Id
+    run_id: Id
+    orchestration_version: NonEmptyString
+    workflow_step: NonEmptyString
+    executor_type: ExecutorType
+    status: WorkflowEventStatus
+    started_at: Timestamp
+    ended_at: Timestamp
+    parent_run_id: Id | None = None
+    skills_hash: Sha256 | None = None
+    policy_hash: Sha256 | None = None
+    state: WorkflowState | None = None
+    exit_code: int | None = None
+    tokens_in: int | None = Field(default=None, ge=0)
+    tokens_out: int | None = Field(default=None, ge=0)
+    llm_cost_usd: float | None = Field(default=None, ge=0)
+    compute_seconds: float | None = Field(default=None, ge=0)
+    ci_minutes_est: float | None = Field(default=None, ge=0)
+    compute_cost_usd: float | None = Field(default=None, ge=0)
+    human_minutes: float | None = Field(default=None, ge=0)
+    human_cost_usd: float | None = Field(default=None, ge=0)
+    artifacts: list[ArtifactRef] | None = None
+    duration_seconds: float | None = Field(default=None, ge=0)
+    complexity_bucket: ComplexityBucket | None = None
+    changed_loc: int | None = Field(default=None, ge=0)
+    files_changed: int | None = Field(default=None, ge=0)
+    tests_added: int | None = Field(default=None, ge=0)
+    story_points: float | None = Field(default=None, ge=0)
+
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+CERTIFICATE_MODELS: dict[str, type[CertificateEnvelope]] = {
+    "task_review": TaskReviewCertificate,
+    "design_decision": DesignDecisionCertificate,
+    "deferred_scope": DeferredScopeCertificate,
+    "impact_alignment": ImpactAlignmentCertificate,
+}
+
+
+def validate_certificate(data: dict[str, Any]) -> CertificateEnvelope:
+    """Dispatch to the correct certificate model based on certificate_type."""
+    cert_type = data.get("certificate_type")
+    if cert_type not in CERTIFICATE_MODELS:
+        raise KeyError(f"Unknown or missing certificate_type: {cert_type!r}")
+    return CERTIFICATE_MODELS[cert_type].model_validate(data)

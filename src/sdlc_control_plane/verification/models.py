@@ -453,23 +453,23 @@ class DeferredEvaluation(BaseModel):
     current_state_consistent: bool
 
 
-class IssueImpactAssessment(BaseModel):
+class IssueImpactAssessment(ClaimBase):
     model_config = ConfigDict(extra="forbid")
 
     issue_ref: ArtifactRef
     impact_status: ImpactStatus
     action: NonEmptyString
-    verification: VerificationRecord
+    verification: VerificationRecord  # Override: required (was optional on ClaimBase)
     impact_description: NonEmptyString | None = None
 
 
-class DocumentationImpact(BaseModel):
+class DocumentationImpact(ClaimBase):
     model_config = ConfigDict(extra="forbid")
 
     document_ref: ArtifactRef
     status: DocumentationImpactStatus
     description: NonEmptyString | None = None
-    verification: VerificationRecord | None = None
+    verification: VerificationRecord | None = None  # Stays optional
 
 
 class DependencyGraph(BaseModel):
@@ -500,6 +500,8 @@ class CertificateEnvelope(BaseModel):
     validation_notes: NonEmptyString | None = None
     verified_claim_count: int | None = Field(default=None, ge=0)
     unverified_claim_count: int | None = Field(default=None, ge=0)
+    artifact_inventory: list[ArtifactRef] | None = None
+    evidence_inventory: list[EvidenceRef] | None = None
 
 
 # ---------------------------------------------------------------------------

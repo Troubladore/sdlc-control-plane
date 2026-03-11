@@ -349,7 +349,15 @@
         },
         "validation_notes": { "$ref": "#/$defs/NonEmptyString" },
         "verified_claim_count": { "type": "integer", "minimum": 0 },
-        "unverified_claim_count": { "type": "integer", "minimum": 0 }
+        "unverified_claim_count": { "type": "integer", "minimum": 0 },
+        "artifact_inventory": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ArtifactRef" }
+        },
+        "evidence_inventory": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceRef" }
+        }
       }
     },
     "TaskReviewCertificate": {
@@ -519,8 +527,16 @@
     "IssueImpactAssessment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["issue_ref", "impact_status", "action", "verification"],
+      "required": ["claim_id", "text", "evidence_refs", "issue_ref", "impact_status", "action", "verification"],
       "properties": {
+        "claim_id": { "$ref": "#/$defs/Id" },
+        "text": { "$ref": "#/$defs/NonEmptyString" },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/EvidenceRef" }
+        },
+        "notes": { "$ref": "#/$defs/NonEmptyString" },
         "issue_ref": { "$ref": "#/$defs/ArtifactRef" },
         "impact_status": {
           "type": "string",
@@ -534,8 +550,16 @@
     "DocumentationImpact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["document_ref", "status"],
+      "required": ["claim_id", "text", "evidence_refs", "document_ref", "status"],
       "properties": {
+        "claim_id": { "$ref": "#/$defs/Id" },
+        "text": { "$ref": "#/$defs/NonEmptyString" },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/EvidenceRef" }
+        },
+        "notes": { "$ref": "#/$defs/NonEmptyString" },
         "document_ref": { "$ref": "#/$defs/ArtifactRef" },
         "status": {
           "type": "string",

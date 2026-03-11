@@ -109,6 +109,16 @@ docs/
 
 ## Documentation
 
+| Thread | Entry Point | Description |
+|--------|------------|-------------|
+| Architecture | [Design Doc](docs/design/2026-03-10-issue-114-sdlc-control-plane-design.md) | System design and session roadmap |
+| Verification | [docs/verification/](docs/verification/README.md) | Evidence model, referential validation, diagnostics |
+| Decisions | [docs/decisions/](docs/decisions/README.md) | Why specific technical choices were made |
+| Process | [docs/process/](docs/process/) | Certificate-driven development workflow |
+| Implementation | [CLAUDE.md](CLAUDE.md) | Contributing and development conventions |
+
+### Reference Documents
+
 - [Certificate-Driven Development](docs/process/certificate-driven-development.md) -- process definition and certificate templates
 - [Development Lifecycle BPMN](docs/process/development-lifecycle-bpmn.md) -- full workflow specification
 - [Validation Architecture](docs/process/agent_validation_architecture.md) -- 9-stage pipeline and KPI model

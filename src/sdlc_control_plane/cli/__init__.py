@@ -13,7 +13,7 @@ from rich.console import Console
 
 from sdlc_control_plane.verification.models import validate_certificate
 
-console = Console()
+console = Console(soft_wrap=True)
 
 
 @click.group()

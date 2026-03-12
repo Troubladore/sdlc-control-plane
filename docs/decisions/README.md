@@ -5,6 +5,14 @@
 
 Design decisions record *why* specific technical choices were made. Each decision evaluates options with trade-offs and documents the chosen approach.
 
+## Session 3: Minimal BPMN Process (Happy Path)
+
+| Decision | Summary |
+|----------|---------|
+| [Handler `**kwargs` Pattern](s3-handler-kwargs-pattern.md) | Use `**kwargs` in pyzeebe handlers; `job: Job` annotation broken under PEP 563 |
+| [Sync/Async Strategy](s3-sync-async-strategy.md) | `SyncZeebeClient` for deploy/start; `asyncio.run()` wrapping `ZeebeWorker` for job completion |
+| [CI Cluster Topology](s3-ci-cluster-topology.md) | Integration tests target unauthenticated CI cluster (36500/18088); auth deferred |
+
 ## Session 2: Evidence Inventory + Referential Validation
 
 | Decision | Summary |

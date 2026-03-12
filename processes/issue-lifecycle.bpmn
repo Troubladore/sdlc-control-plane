@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="Definitions_1"
+                  targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="sdlc-control-plane"
+                  exporterVersion="0.1.0">
+
+  <bpmn:process id="issue-lifecycle" name="Issue Lifecycle" isExecutable="true">
+
+    <bpmn:startEvent id="StartEvent_1" name="Issue Assigned">
+      <bpmn:outgoing>Flow_start_triage</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Activity_triage" name="Triage">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="triage" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_start_triage</bpmn:incoming>
+      <bpmn:outgoing>Flow_triage_design</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Activity_design" name="Design">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="design" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_triage_design</bpmn:incoming>
+      <bpmn:outgoing>Flow_design_planning</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Activity_planning" name="Planning">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="planning" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_design_planning</bpmn:incoming>
+      <bpmn:outgoing>Flow_planning_implement</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Activity_implement" name="Implement">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="implement" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_planning_implement</bpmn:incoming>
+      <bpmn:outgoing>Flow_implement_review</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Activity_review" name="Review">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="review" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_implement_review</bpmn:incoming>
+      <bpmn:outgoing>Flow_review_integrate</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Activity_integrate" name="Integrate">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="integrate" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_review_integrate</bpmn:incoming>
+      <bpmn:outgoing>Flow_integrate_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_1" name="Issue Complete">
+      <bpmn:incoming>Flow_integrate_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_start_triage" sourceRef="StartEvent_1" targetRef="Activity_triage" />
+    <bpmn:sequenceFlow id="Flow_triage_design" sourceRef="Activity_triage" targetRef="Activity_design" />
+    <bpmn:sequenceFlow id="Flow_design_planning" sourceRef="Activity_design" targetRef="Activity_planning" />
+    <bpmn:sequenceFlow id="Flow_planning_implement" sourceRef="Activity_planning" targetRef="Activity_implement" />
+    <bpmn:sequenceFlow id="Flow_implement_review" sourceRef="Activity_implement" targetRef="Activity_review" />
+    <bpmn:sequenceFlow id="Flow_review_integrate" sourceRef="Activity_review" targetRef="Activity_integrate" />
+    <bpmn:sequenceFlow id="Flow_integrate_end" sourceRef="Activity_integrate" targetRef="EndEvent_1" />
+
+  </bpmn:process>
+
+</bpmn:definitions>

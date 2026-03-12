@@ -61,7 +61,8 @@ Camunda orchestrates across contexts. Domain services own semantic truth. DMN ta
 ```bash
 git clone https://github.com/Troubladore/sdlc-control-plane.git
 cd sdlc-control-plane
-uv sync --extra dev
+uv sync --extra dev                # Core development
+uv sync --extra dev --extra camunda  # With Camunda/Zeebe support
 ```
 
 ### Run Tests
@@ -69,6 +70,7 @@ uv sync --extra dev
 ```bash
 make check    # lint + type check + tests
 make test     # just tests
+make test-integration  # Integration tests (requires live Camunda cluster)
 ```
 
 ### CLI
@@ -113,6 +115,7 @@ docs/
 |--------|------------|-------------|
 | Architecture | [Design Doc](docs/design/2026-03-10-issue-114-sdlc-control-plane-design.md) | System design and session roadmap |
 | Verification | [docs/verification/](docs/verification/README.md) | Evidence model, referential validation, diagnostics |
+| Orchestration | [docs/orchestration/](docs/orchestration/README.md) | Zeebe client facade, BPMN process model |
 | Decisions | [docs/decisions/](docs/decisions/README.md) | Why specific technical choices were made |
 | Process | [docs/process/](docs/process/) | Certificate-driven development workflow |
 | Implementation | [CLAUDE.md](CLAUDE.md) | Contributing and development conventions |

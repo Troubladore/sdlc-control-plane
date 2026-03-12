@@ -4,6 +4,12 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+import pytest
+
+if TYPE_CHECKING:
+    from xml.etree.ElementTree import Element
 
 BPMN_PATH = Path(__file__).resolve().parent.parent / "processes" / "issue-lifecycle.bpmn"
 
@@ -11,6 +17,17 @@ BPMN_NS = "http://www.omg.org/spec/BPMN/20100524/MODEL"
 ZEEBE_NS = "http://camunda.org/schema/zeebe/1.0"
 
 EXPECTED_PHASES = ["triage", "design", "planning", "implement", "review", "integrate"]
+
+
+@pytest.fixture(scope="module")
+def bpmn_process() -> Element:
+    """Parse the BPMN file once per module and return the process element."""
+    tree = ET.parse(BPMN_PATH)
+    root = tree.getroot()
+    ns = {"bpmn": BPMN_NS}
+    process = root.find("bpmn:process", ns)
+    assert process is not None
+    return process
 
 
 def test_bpmn_file_exists() -> None:
@@ -21,14 +38,9 @@ def test_bpmn_well_formed_xml() -> None:
     ET.parse(BPMN_PATH)  # Raises ParseError if malformed
 
 
-def test_bpmn_process_id() -> None:
-    tree = ET.parse(BPMN_PATH)
-    root = tree.getroot()
-    ns = {"bpmn": BPMN_NS}
-    processes = root.findall("bpmn:process", ns)
-    assert len(processes) == 1
-    assert processes[0].get("id") == "issue-lifecycle"
-    assert processes[0].get("isExecutable") == "true"
+def test_bpmn_process_id(bpmn_process: Element) -> None:
+    assert bpmn_process.get("id") == "issue-lifecycle"
+    assert bpmn_process.get("isExecutable") == "true"
 
 
 def test_bpmn_zeebe_namespace_declared() -> None:
@@ -36,35 +48,23 @@ def test_bpmn_zeebe_namespace_declared() -> None:
     assert ZEEBE_NS in text, "Zeebe extension namespace not declared"
 
 
-def test_bpmn_six_service_tasks() -> None:
-    tree = ET.parse(BPMN_PATH)
-    root = tree.getroot()
+def test_bpmn_six_service_tasks(bpmn_process: Element) -> None:
     ns = {"bpmn": BPMN_NS}
-    process = root.find("bpmn:process", ns)
-    assert process is not None
-    tasks = process.findall("bpmn:serviceTask", ns)
+    tasks = bpmn_process.findall("bpmn:serviceTask", ns)
     assert len(tasks) == 6, f"Expected 6 service tasks, got {len(tasks)}"
 
 
-def test_bpmn_task_ids() -> None:
-    tree = ET.parse(BPMN_PATH)
-    root = tree.getroot()
+def test_bpmn_task_ids(bpmn_process: Element) -> None:
     ns = {"bpmn": BPMN_NS}
-    process = root.find("bpmn:process", ns)
-    assert process is not None
-    tasks = process.findall("bpmn:serviceTask", ns)
+    tasks = bpmn_process.findall("bpmn:serviceTask", ns)
     task_ids = [t.get("id") for t in tasks]
     expected_ids = [f"Activity_{phase}" for phase in EXPECTED_PHASES]
     assert task_ids == expected_ids
 
 
-def test_bpmn_job_types() -> None:
-    tree = ET.parse(BPMN_PATH)
-    root = tree.getroot()
+def test_bpmn_job_types(bpmn_process: Element) -> None:
     ns = {"bpmn": BPMN_NS, "zeebe": ZEEBE_NS}
-    process = root.find("bpmn:process", ns)
-    assert process is not None
-    tasks = process.findall("bpmn:serviceTask", ns)
+    tasks = bpmn_process.findall("bpmn:serviceTask", ns)
     job_types: list[str] = []
     for task in tasks:
         ext = task.find("bpmn:extensionElements", ns)
@@ -77,17 +77,13 @@ def test_bpmn_job_types() -> None:
     assert job_types == EXPECTED_PHASES
 
 
-def test_bpmn_sequence_flow_connectivity() -> None:
+def test_bpmn_sequence_flow_connectivity(bpmn_process: Element) -> None:
     """Verify start -> 6 tasks in order -> end via sequence flows."""
-    tree = ET.parse(BPMN_PATH)
-    root = tree.getroot()
     ns = {"bpmn": BPMN_NS}
-    process = root.find("bpmn:process", ns)
-    assert process is not None
 
     # Build adjacency from sequence flows
     flows: dict[str, str] = {}
-    for sf in process.findall("bpmn:sequenceFlow", ns):
+    for sf in bpmn_process.findall("bpmn:sequenceFlow", ns):
         src = sf.get("sourceRef")
         tgt = sf.get("targetRef")
         assert src is not None and tgt is not None

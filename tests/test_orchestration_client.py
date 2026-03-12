@@ -2,67 +2,55 @@
 
 from __future__ import annotations
 
+import importlib
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 import pytest
 
 from sdlc_control_plane.orchestration.config import ZeebeConfig
 
 
+@pytest.fixture()
+def _without_pyzeebe() -> Generator[None, None, None]:
+    """Temporarily hide pyzeebe from sys.modules, then restore and reload."""
+    saved = {}
+    to_remove = [k for k in sys.modules if k.startswith("pyzeebe")]
+    for k in to_remove:
+        saved[k] = sys.modules.pop(k)
+
+    try:
+        with patch.dict(sys.modules, {"pyzeebe": None, "pyzeebe.channel": None}):
+            yield
+    finally:
+        sys.modules.update(saved)
+        import sdlc_control_plane.orchestration.client as mod
+
+        importlib.reload(mod)
+
+
 class TestConditionalImport:
-    def test_module_imports_without_pyzeebe(self) -> None:
+    def test_module_imports_without_pyzeebe(self, _without_pyzeebe: None) -> None:
         """The orchestration.client module should import cleanly even
         when pyzeebe is not installed."""
-        saved = {}
-        to_remove = [k for k in sys.modules if k.startswith("pyzeebe")]
-        for k in to_remove:
-            saved[k] = sys.modules.pop(k)
+        import sdlc_control_plane.orchestration.client as mod
 
-        try:
-            with patch.dict(sys.modules, {"pyzeebe": None, "pyzeebe.channel": None}):
-                import importlib
+        importlib.reload(mod)
+        assert hasattr(mod, "ZeebeClient")
 
-                import sdlc_control_plane.orchestration.client as mod
-
-                importlib.reload(mod)
-                assert hasattr(mod, "ZeebeClient")
-        finally:
-            sys.modules.update(saved)
-            import importlib
-
-            import sdlc_control_plane.orchestration.client as mod
-
-            importlib.reload(mod)
-
-    def test_constructor_raises_without_pyzeebe(self) -> None:
+    def test_constructor_raises_without_pyzeebe(self, _without_pyzeebe: None) -> None:
         """ZeebeClient() should raise ImportError with install instructions."""
-        saved = {}
-        to_remove = [k for k in sys.modules if k.startswith("pyzeebe")]
-        for k in to_remove:
-            saved[k] = sys.modules.pop(k)
+        import sdlc_control_plane.orchestration.client as mod
 
-        try:
-            with patch.dict(
-                sys.modules, {"pyzeebe": None, "pyzeebe.channel": None}
-            ):
-                import importlib
-
-                import sdlc_control_plane.orchestration.client as mod
-
-                importlib.reload(mod)
-                config = ZeebeConfig()
-                with pytest.raises(ImportError, match="uv sync --extra camunda"):
-                    mod.ZeebeClient(config)
-        finally:
-            sys.modules.update(saved)
-            import importlib
-
-            import sdlc_control_plane.orchestration.client as mod
-
-            importlib.reload(mod)
+        importlib.reload(mod)
+        config = ZeebeConfig()
+        with pytest.raises(ImportError, match="uv sync --extra camunda"):
+            mod.ZeebeClient(config)
 
 
 def _make_client() -> Any:

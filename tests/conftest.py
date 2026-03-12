@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import socket
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # CI cluster defaults (unauthenticated, for automated testing)
 CI_ZEEBE_GRPC = "localhost:36500"
@@ -96,10 +100,8 @@ def instance_cleanup(zeebe_grpc_address: str) -> Generator[list[int], None, None
             channel = create_insecure_channel(grpc_address=zeebe_grpc_address)
             client = SyncZeebeClient(grpc_channel=channel)
             for key in keys:
-                try:
+                with contextlib.suppress(Exception):
                     client.cancel_process_instance(key)
-                except Exception:
-                    pass  # Already completed or gone
         finally:
             loop.close()
     except ImportError:

@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 # Lazy imports -- module loads cleanly without pyzeebe installed.
 # The dependency is checked at ZeebeClient construction time.
 try:
-    from pyzeebe import Job as _Job
     from pyzeebe import SyncZeebeClient as _SyncZeebeClient
     from pyzeebe import ZeebeWorker as _ZeebeWorker
     from pyzeebe.channel import create_insecure_channel
@@ -143,10 +142,11 @@ class ZeebeClient:
                 return result
 
             worker_task = asyncio.create_task(worker.work())
+            loop = asyncio.get_running_loop()
             try:
-                deadline = asyncio.get_event_loop().time() + timeout
+                deadline = loop.time() + timeout
                 while len(completed) < max_jobs:
-                    if asyncio.get_event_loop().time() > deadline:
+                    if loop.time() > deadline:
                         break
                     await asyncio.sleep(0.2)
             finally:
@@ -154,7 +154,7 @@ class ZeebeClient:
                 worker_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await worker_task
+                await channel.close()
             return completed
 
-        asyncio.run(_run())
-        return completed
+        return asyncio.run(_run())

@@ -31,6 +31,7 @@ dev = [
     "hypothesis>=6.90",
     "mypy>=1.8",
     "ruff>=0.3",
+    "httpx>=0.27",
 ]
 
 [project.scripts]
@@ -46,6 +47,8 @@ packages = ["src/sdlc_control_plane"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = ["integration: requires live Camunda cluster"]
+addopts = "-m 'not integration'"
 
 [tool.mypy]
 python_version = "3.10"

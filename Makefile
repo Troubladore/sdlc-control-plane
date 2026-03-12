@@ -1,4 +1,4 @@
-.PHONY: test test-all lint typecheck check fmt
+.PHONY: test test-all lint typecheck check fmt test-integration
 
 test:
 	uv run pytest -x -q
@@ -13,6 +13,9 @@ typecheck:
 	uv run mypy src/
 
 check: lint typecheck test
+
+test-integration:
+	uv run pytest -m integration -v
 
 fmt:
 	uv run ruff format src/ tests/

@@ -15,7 +15,7 @@ typecheck:
 check: lint typecheck test
 
 test-integration:
-	uv run pytest -m integration -v
+	uv run pytest -m integration -v --override-ini="addopts="
 
 fmt:
 	uv run ruff format src/ tests/

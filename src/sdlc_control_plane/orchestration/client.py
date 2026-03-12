@@ -128,13 +128,18 @@ class ZeebeClient:
             worker = _ZeebeWorker(grpc_channel=channel)
 
             @worker.task(task_type=job_type)  # type: ignore[arg-type]
-            async def _handle(job: _Job) -> dict[str, Any]:
+            async def _handle(**kwargs: Any) -> dict[str, Any]:
+                # ``from __future__ import annotations`` turns all type hints
+                # into strings, so we cannot use a ``Job``-annotated parameter
+                # here -- pyzeebe's introspection would not recognise it.
+                # Instead accept **kwargs (all job variables) and use the
+                # outer ``job_type`` closure variable to record completion.
                 result: dict[str, Any] = {}
                 if handler is not None:
-                    out = handler(dict(job.variables))
+                    out = handler(kwargs)
                     if out is not None:
                         result = out
-                completed.append(job.type)
+                completed.append(job_type)
                 return result
 
             worker_task = asyncio.create_task(worker.work())

@@ -82,15 +82,25 @@ def instance_cleanup(zeebe_grpc_address: str) -> Generator[list[int], None, None
     if not keys:
         return
     try:
+        import asyncio
+
         from pyzeebe import SyncZeebeClient
         from pyzeebe.channel import create_insecure_channel
 
-        channel = create_insecure_channel(grpc_address=zeebe_grpc_address)
-        client = SyncZeebeClient(grpc_channel=channel)
-        for key in keys:
-            try:
-                client.cancel_process_instance(key)
-            except Exception:
-                pass  # Already completed or gone
+        # asyncio.run() in run_worker closes the default event loop.
+        # grpc.aio and SyncZeebeClient both require a running event loop,
+        # so we install a fresh one before constructing the cleanup client.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            channel = create_insecure_channel(grpc_address=zeebe_grpc_address)
+            client = SyncZeebeClient(grpc_channel=channel)
+            for key in keys:
+                try:
+                    client.cancel_process_instance(key)
+                except Exception:
+                    pass  # Already completed or gone
+        finally:
+            loop.close()
     except ImportError:
         pass
